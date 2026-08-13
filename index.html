@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Vivid — Voice AI agents that sound human</title>
+<meta name="description" content="Vivid is a voice AI agent that answers, understands and acts on every call. Sub-400ms responses, natural interruption handling, 32 languages." />
+<meta name="theme-color" content="#090909" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Inter:ital,opsz,wght@0,14..32,400..700&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="styles.css" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23090909'/%3E%3Cg fill='%23fff'%3E%3Crect x='7' y='13' width='2.5' height='6' rx='1.25'/%3E%3Crect x='12' y='9' width='2.5' height='14' rx='1.25'/%3E%3Crect x='17' y='6' width='2.5' height='20' rx='1.25'/%3E%3Crect x='22' y='12' width='2.5' height='8' rx='1.25'/%3E%3C/g%3E%3C/svg%3E" />
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to content</a>
+
+<!-- ══════════════════ NAV ══════════════════ -->
+<header class="nav" id="nav">
+  <div class="nav__inner">
+    <a class="wordmark" href="#top" aria-label="Vivid home">
+      <span class="wordmark__glyph" aria-hidden="true">
+        <i></i><i></i><i></i><i></i>
+      </span>
+      <span class="wordmark__text">Vivid</span>
+    </a>
+
+    <nav class="nav__links" aria-label="Primary">
+      <a href="#platform">Platform</a>
+      <a href="#voices">Voices</a>
+      <a href="#how">How it works</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#faq">FAQ</a>
+    </nav>
+
+    <div class="nav__actions">
+      <a class="btn btn--secondary nav__signin" href="#">Sign in</a>
+      <a class="btn btn--primary" href="#cta">Start free</a>
+      <button class="nav__burger" id="burger" aria-label="Open menu" aria-expanded="false" aria-controls="mobile-menu">
+        <span></span><span></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="nav__sheet" id="mobile-menu" hidden>
+    <a href="#platform">Platform</a>
+    <a href="#voices">Voices</a>
+    <a href="#how">How it works</a>
+    <a href="#pricing">Pricing</a>
+    <a href="#faq">FAQ</a>
+    <a href="#">Sign in</a>
+  </div>
+</header>
+
+<main id="main">
+
+<!-- ══════════════════ HERO ══════════════════ -->
+<section class="hero" id="top">
+  <div class="shell hero__inner">
+    <p class="eyebrow reveal"><span class="pulse-dot" aria-hidden="true"></span> Vivid 2.0 — real-time interruption handling</p>
+
+    <h1 class="display-xxl reveal" style="--d:60ms">
+      The voice agent<br />nobody hangs up&nbsp;on.
+    </h1>
+
+    <p class="body-lg muted hero__sub reveal" style="--d:120ms">
+      Vivid picks up on the first ring, holds a real conversation, and finishes the
+      job — booking, qualifying, resolving. Sub-400&nbsp;ms responses, natural
+      turn-taking, 32 languages.
+    </p>
+
+    <div class="hero__cta reveal" style="--d:180ms">
+      <a class="btn btn--primary btn--lg" href="#cta">Start free</a>
+      <a class="btn btn--secondary btn--lg" href="#demo">
+        <svg class="ico" viewBox="0 0 16 16" aria-hidden="true"><path d="M5 3.5v9l7-4.5-7-4.5Z" fill="currentColor"/></svg>
+        Hear a live call
+      </a>
+    </div>
+
+    <p class="micro muted hero__note reveal" style="--d:220ms">
+      No credit card · 100 free minutes · Live in about 6 minutes
+    </p>
+  </div>
+
+  <!-- product mockup tile: live call panel -->
+  <div class="shell">
+    <div class="hero__panel reveal" style="--d:120ms">
+      <div class="mockup mockup--call" id="callPanel">
+        <div class="mockup__bar">
+          <span class="mockup__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="mockup__title caption">Inbound · +1 (415) 555-0134 · Northwind Dental</span>
+          <span class="chip chip--live"><span class="pulse-dot" aria-hidden="true"></span>Live</span>
+        </div>
+
+        <div class="callgrid">
+          <div class="callgrid__main">
+            <div class="callhead">
+              <div class="callhead__id">
+                <span class="avatar" aria-hidden="true">V</span>
+                <span>
+                  <span class="callhead__name">Vivid · Riley</span>
+                  <span class="callhead__meta micro muted">Support agent · en-US</span>
+                </span>
+              </div>
+              <span class="callhead__timer micro" id="timer">00:41</span>
+            </div>
+
+            <div class="wave wave--panel" data-bars="56" aria-hidden="true"></div>
+
+            <ul class="transcript" id="transcript" aria-label="Live transcript"></ul>
+          </div>
+
+          <aside class="signals" aria-label="Call signals">
+            <p class="caption muted signals__h">Live signals</p>
+
+            <div class="signal">
+              <span class="signal__k micro muted">Response latency</span>
+              <span class="signal__v"><b id="latency">312</b> ms</span>
+              <span class="meter"><i style="--w:31%"></i></span>
+            </div>
+
+            <div class="signal">
+              <span class="signal__k micro muted">Detected intent</span>
+              <span class="signal__v">Reschedule</span>
+              <span class="meter"><i style="--w:92%"></i></span>
+            </div>
+
+            <div class="signal">
+              <span class="signal__k micro muted">Caller sentiment</span>
+              <span class="signal__v">Calm</span>
+              <span class="meter"><i style="--w:78%"></i></span>
+            </div>
+
+            <div class="signal signal--flat">
+              <span class="signal__k micro muted">Tools called</span>
+              <span class="signal__v">lookupProvider · bookSlot</span>
+            </div>
+
+            <div class="signal signal--flat">
+              <span class="signal__k micro muted">Handoff</span>
+              <span class="signal__v"><span class="pulse-dot" aria-hidden="true"></span> Not needed</span>
+            </div>
+          </aside>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- trust strip -->
+  <div class="shell">
+    <div class="trust reveal">
+      <p class="caption muted trust__label">Answering calls for</p>
+      <div class="trust__row">
+        <span>Northwind</span><span>Palette</span><span>Rivet&nbsp;Health</span>
+        <span>Cobalt</span><span>Otter&amp;Co</span><span>Loop</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ PLATFORM / CAPABILITY GRID ══════════════════ -->
+<section class="section" id="platform">
+  <div class="shell">
+    <header class="section__head reveal">
+      <p class="eyebrow">Platform</p>
+      <h2 class="display-xl">One agent.<br />Every call you can’t take.</h2>
+      <p class="body-lg muted section__lede">
+        Vivid isn’t a phone tree with a nicer voice. It listens, reasons over your
+        systems, and takes the action — mid-sentence if it has to.
+      </p>
+    </header>
+
+    <div class="cards">
+      <article class="card reveal">
+        <span class="card__ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 4v16M7 8v8M17 8v8M3 11v2M21 11v2"/></svg>
+        </span>
+        <h3 class="display-md">Interrupts like a person</h3>
+        <p class="body muted">
+          Barge-in detection at 40&nbsp;ms. When the caller cuts in, Vivid stops
+          talking, keeps the context, and picks the thread back up.
+        </p>
+      </article>
+
+      <article class="card reveal" style="--d:60ms">
+        <span class="card__ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+        </span>
+        <h3 class="display-md">312&nbsp;ms median</h3>
+        <p class="body muted">
+          Streaming ASR, inference and TTS run in one pipeline on the same edge
+          node. No awkward pause after the caller stops speaking.
+        </p>
+      </article>
+
+      <article class="card reveal" style="--d:120ms">
+        <span class="card__ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M4 7h16M4 12h10M4 17h13"/></svg>
+        </span>
+        <h3 class="display-md">Acts, not just answers</h3>
+        <p class="body muted">
+          Book the slot, refund the order, update the CRM. Give Vivid tools and it
+          calls them mid-conversation, then tells the caller what it did.
+        </p>
+      </article>
+
+      <!-- signature: gradient spotlight card -->
+      <article class="spotlight spotlight--violet reveal">
+        <p class="caption spotlight__eyebrow">Signature</p>
+        <h3 class="display-lg">Sounds like somebody.</h3>
+        <p class="subhead">
+          Breath, hesitation, laughter, the little “mm-hm” that tells a caller
+          they’ve been heard. 42 studio voices, or clone your own in 90 seconds.
+        </p>
+        <div class="wave wave--spot" data-bars="48" aria-hidden="true"></div>
+      </article>
+
+      <article class="card reveal" style="--d:60ms">
+        <span class="card__ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="8"/><path d="M4 12h16M12 4c2.5 2.6 2.5 12.4 0 16M12 4c-2.5 2.6-2.5 12.4 0 16"/></svg>
+        </span>
+        <h3 class="display-md">32 languages</h3>
+        <p class="body muted">
+          Accent-aware in the ones that matter. Vivid switches language when the
+          caller does, without losing the thread.
+        </p>
+      </article>
+
+      <article class="card card--wide reveal">
+        <span class="card__ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M12 3l7 3v6c0 4-3 7-7 9-4-2-7-5-7-9V6l7-3Z"/><path d="M9.5 12l1.8 1.8L15 10"/></svg>
+        </span>
+        <div class="card__wideText">
+          <h3 class="display-md">SOC 2 · HIPAA · GDPR</h3>
+          <p class="body muted">
+            PII redaction before anything hits storage, per-region audio residency,
+            retention you set from 0 to 365 days, and a hard delete you can verify
+            in the audit log.
+          </p>
+        </div>
+        <a class="btn btn--secondary" href="#">Security overview</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ VOICES ══════════════════ -->
+<section class="section section--tight" id="voices">
+  <div class="shell">
+    <header class="section__head section__head--split reveal">
+      <div>
+        <p class="eyebrow">Voices</p>
+        <h2 class="display-lg">Pick a voice.<br />Or bring your own.</h2>
+      </div>
+      <p class="body muted section__lede">
+        Every voice runs the same latency budget. Previews are illustrative —
+        connect a number to hear it on a real call.
+      </p>
+    </header>
+
+    <div class="voices reveal" id="voices-list">
+      <button class="voice" type="button" data-voice="Riley" aria-pressed="false">
+        <span class="voice__play" aria-hidden="true">
+          <svg class="ico-play" viewBox="0 0 16 16"><path d="M5 3.5v9l7-4.5-7-4.5Z" fill="currentColor"/></svg>
+          <svg class="ico-pause" viewBox="0 0 16 16"><rect x="4.5" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/><rect x="9" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/></svg>
+        </span>
+        <span class="voice__id">
+          <span class="voice__name">Riley</span>
+          <span class="micro muted">en-US · warm, unhurried</span>
+        </span>
+        <span class="wave wave--row" data-bars="28" aria-hidden="true"></span>
+        <span class="chip">Support</span>
+      </button>
+
+      <button class="voice" type="button" data-voice="Ines" aria-pressed="false">
+        <span class="voice__play" aria-hidden="true">
+          <svg class="ico-play" viewBox="0 0 16 16"><path d="M5 3.5v9l7-4.5-7-4.5Z" fill="currentColor"/></svg>
+          <svg class="ico-pause" viewBox="0 0 16 16"><rect x="4.5" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/><rect x="9" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/></svg>
+        </span>
+        <span class="voice__id">
+          <span class="voice__name">Inés</span>
+          <span class="micro muted">es-MX · bright, quick</span>
+        </span>
+        <span class="wave wave--row" data-bars="28" aria-hidden="true"></span>
+        <span class="chip">Sales</span>
+      </button>
+
+      <button class="voice" type="button" data-voice="Tobias" aria-pressed="false">
+        <span class="voice__play" aria-hidden="true">
+          <svg class="ico-play" viewBox="0 0 16 16"><path d="M5 3.5v9l7-4.5-7-4.5Z" fill="currentColor"/></svg>
+          <svg class="ico-pause" viewBox="0 0 16 16"><rect x="4.5" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/><rect x="9" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/></svg>
+        </span>
+        <span class="voice__id">
+          <span class="voice__name">Tobias</span>
+          <span class="micro muted">de-DE · precise, low</span>
+        </span>
+        <span class="wave wave--row" data-bars="28" aria-hidden="true"></span>
+        <span class="chip">Ops</span>
+      </button>
+
+      <button class="voice" type="button" data-voice="Ada" aria-pressed="false">
+        <span class="voice__play" aria-hidden="true">
+          <svg class="ico-play" viewBox="0 0 16 16"><path d="M5 3.5v9l7-4.5-7-4.5Z" fill="currentColor"/></svg>
+          <svg class="ico-pause" viewBox="0 0 16 16"><rect x="4.5" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/><rect x="9" y="3.5" width="2.5" height="9" rx="1" fill="currentColor"/></svg>
+        </span>
+        <span class="voice__id">
+          <span class="voice__name">Ada</span>
+          <span class="micro muted">en-GB · dry, efficient</span>
+        </span>
+        <span class="wave wave--row" data-bars="28" aria-hidden="true"></span>
+        <span class="chip">Triage</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ HOW IT WORKS ══════════════════ -->
+<section class="section" id="how">
+  <div class="shell">
+    <header class="section__head reveal">
+      <p class="eyebrow">How it works</p>
+      <h2 class="display-xl">Live in an afternoon.</h2>
+    </header>
+
+    <ol class="steps">
+      <li class="step reveal">
+        <span class="step__n caption">01</span>
+        <h3 class="display-md">Point a number at Vivid</h3>
+        <p class="body muted">
+          Port an existing line or buy one in the dashboard. Twilio, Vonage and SIP
+          trunks work out of the box.
+        </p>
+      </li>
+      <li class="step reveal" style="--d:60ms">
+        <span class="step__n caption">02</span>
+        <h3 class="display-md">Describe the job</h3>
+        <p class="body muted">
+          Plain English instructions plus your knowledge base. Attach tools —
+          calendar, CRM, order lookup — as typed functions.
+        </p>
+      </li>
+      <li class="step reveal" style="--d:120ms">
+        <span class="step__n caption">03</span>
+        <h3 class="display-md">Watch the first calls</h3>
+        <p class="body muted">
+          Every call comes back with audio, transcript, tool trace and a score.
+          Correct it once; it holds.
+        </p>
+      </li>
+    </ol>
+
+    <!-- code / config tile -->
+    <div class="mockup mockup--code reveal">
+      <div class="mockup__bar">
+        <span class="mockup__dots" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span class="mockup__title caption">agent.ts</span>
+        <span class="chip">TypeScript SDK</span>
+      </div>
+<pre class="code"><code><span class="c-k">import</span> { Agent } <span class="c-k">from</span> <span class="c-s">"@vivid/voice"</span>;
+
+<span class="c-k">export default new</span> <span class="c-f">Agent</span>({
+  voice: <span class="c-s">"riley"</span>,
+  greeting: <span class="c-s">"Northwind Dental, this is Riley — how can I help?"</span>,
+  <span class="c-c">// tools are called mid-conversation</span>
+  tools: [<span class="c-f">bookAppointment</span>, <span class="c-f">lookupPatient</span>, <span class="c-f">transferToHuman</span>],
+  handoff: { <span class="c-k">on</span>: <span class="c-s">"frustration &gt; 0.7"</span>, to: <span class="c-s">"+14155550134"</span> },
+});</code></pre>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ METRICS ══════════════════ -->
+<section class="section section--tight">
+  <div class="shell">
+    <div class="metrics">
+      <div class="metric reveal">
+        <span class="metric__v display-lg" data-count="312" data-suffix="ms">312ms</span>
+        <span class="body-sm muted">Median response, speech to speech</span>
+      </div>
+      <div class="metric reveal" style="--d:60ms">
+        <span class="metric__v display-lg" data-count="94" data-suffix="%">94%</span>
+        <span class="body-sm muted">Calls resolved without a human</span>
+      </div>
+      <div class="metric reveal" style="--d:120ms">
+        <span class="metric__v display-lg" data-count="32" data-suffix="">32</span>
+        <span class="body-sm muted">Languages, accent-aware</span>
+      </div>
+      <div class="metric reveal" style="--d:180ms">
+        <span class="metric__v display-lg" data-count="99.99" data-suffix="%">99.99%</span>
+        <span class="body-sm muted">Uptime across three regions</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ DEMO / SPOTLIGHT ══════════════════ -->
+<section class="section" id="demo">
+  <div class="shell">
+    <div class="duo">
+      <article class="spotlight spotlight--sunset reveal">
+        <p class="caption spotlight__eyebrow">Try it</p>
+        <h2 class="display-lg">Call Vivid.<br />It’ll pick up.</h2>
+        <p class="subhead">
+          Ring the demo line and book a fake dentist appointment. Interrupt it,
+          change your mind, switch to Spanish halfway — that’s the point.
+        </p>
+        <a class="btn btn--onlight btn--lg" href="tel:+14155550134">+1 (415) 555-0134</a>
+      </article>
+
+      <div class="stack">
+        <article class="card card--flat reveal">
+          <h3 class="display-md">Every call, replayable</h3>
+          <p class="body muted">
+            Audio, diarised transcript, tool calls with arguments, and the exact
+            model turn that produced each line.
+          </p>
+          <ul class="ticks body-sm">
+            <li>Sentiment + intent per turn</li>
+            <li>PII redacted before it lands in storage</li>
+            <li>One-click eval set from any real call</li>
+          </ul>
+        </article>
+
+        <article class="card card--flat reveal" style="--d:60ms">
+          <h3 class="display-md">Hands off when it should</h3>
+          <p class="body muted">
+            Set the conditions — frustration, high-value account, anything unknown —
+            and Vivid warm-transfers with a spoken summary.
+          </p>
+        </article>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ INTEGRATIONS ══════════════════ -->
+<section class="section section--tight">
+  <div class="shell">
+    <header class="section__head section__head--split reveal">
+      <div>
+        <p class="eyebrow">Integrations</p>
+        <h2 class="display-lg">Plugs into<br />what you already run.</h2>
+      </div>
+      <p class="body muted section__lede">
+        Native connectors for the usual suspects, plus a typed function API for
+        everything else.
+      </p>
+    </header>
+
+    <div class="integrations reveal">
+      <span class="int">Twilio</span><span class="int">Salesforce</span><span class="int">HubSpot</span>
+      <span class="int">Zendesk</span><span class="int">Google Calendar</span><span class="int">Stripe</span>
+      <span class="int">Slack</span><span class="int">Intercom</span><span class="int">Segment</span>
+      <span class="int">Epic</span><span class="int">SIP trunk</span><span class="int">Webhooks</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ PRICING ══════════════════ -->
+<section class="section" id="pricing">
+  <div class="shell">
+    <header class="section__head section__head--center reveal">
+      <p class="eyebrow">Pricing</p>
+      <h2 class="display-xl">Pay for talk time.<br />Nothing else.</h2>
+
+      <div class="tabs" role="tablist" aria-label="Billing period">
+        <button class="tab is-selected" role="tab" aria-selected="true" data-plan="monthly">Monthly</button>
+        <button class="tab" role="tab" aria-selected="false" data-plan="annual">Annual <span class="tab__save">−20%</span></button>
+      </div>
+    </header>
+
+    <div class="tiers">
+      <article class="tier reveal">
+        <h3 class="headline">Free</h3>
+        <p class="tier__price"><span class="display-md">$0</span></p>
+        <p class="body-sm muted tier__meta">100 minutes, once</p>
+        <a class="btn btn--secondary btn--block" href="#cta">Start free</a>
+        <ul class="ticks body-sm">
+          <li>1 agent, 1 number</li>
+          <li>All 42 voices</li>
+          <li>7-day call history</li>
+          <li>Community support</li>
+        </ul>
+      </article>
+
+      <article class="tier reveal" style="--d:60ms">
+        <h3 class="headline">Starter</h3>
+        <p class="tier__price"><span class="display-md" data-m="$49" data-a="$39">$49</span><span class="body-sm muted">/mo</span></p>
+        <p class="body-sm muted tier__meta">+ $0.09 / min</p>
+        <a class="btn btn--secondary btn--block" href="#cta">Choose Starter</a>
+        <ul class="ticks body-sm">
+          <li>3 agents, 5 numbers</li>
+          <li>Tool calling + webhooks</li>
+          <li>90-day call history</li>
+          <li>Email support</li>
+        </ul>
+      </article>
+
+      <article class="tier tier--featured reveal" style="--d:120ms">
+        <span class="tier__flag caption">Most teams</span>
+        <h3 class="headline">Growth</h3>
+        <p class="tier__price"><span class="display-md" data-m="$199" data-a="$159">$199</span><span class="body-sm muted">/mo</span></p>
+        <p class="body-sm muted tier__meta">+ $0.06 / min</p>
+        <a class="btn btn--primary btn--block" href="#cta">Choose Growth</a>
+        <ul class="ticks body-sm">
+          <li>Unlimited agents</li>
+          <li>Voice cloning + custom pronunciation</li>
+          <li>Warm transfer &amp; escalation rules</li>
+          <li>Eval suites + A/B on live traffic</li>
+          <li>Priority support, 4h response</li>
+        </ul>
+      </article>
+
+      <article class="tier reveal" style="--d:180ms">
+        <h3 class="headline">Enterprise</h3>
+        <p class="tier__price"><span class="display-md">Custom</span></p>
+        <p class="body-sm muted tier__meta">Volume rates from $0.03 / min</p>
+        <a class="btn btn--secondary btn--block" href="#cta">Talk to sales</a>
+        <ul class="ticks body-sm">
+          <li>Regional audio residency</li>
+          <li>SSO, SCIM, audit log</li>
+          <li>BAA + custom DPA</li>
+          <li>Dedicated capacity &amp; SLA</li>
+        </ul>
+      </article>
+    </div>
+
+    <p class="micro muted pricing__note reveal">
+      Minutes billed by the second. Annual plans are billed yearly; per-minute rates are unchanged.
+    </p>
+  </div>
+</section>
+
+<!-- ══════════════════ FAQ ══════════════════ -->
+<section class="section section--tight" id="faq">
+  <div class="shell shell--narrow">
+    <header class="section__head reveal">
+      <p class="eyebrow">FAQ</p>
+      <h2 class="display-lg">The usual questions.</h2>
+    </header>
+
+    <div class="faq reveal" id="faq-list">
+      <details class="faq__row">
+        <summary><span class="headline">Will callers know it’s AI?</span><span class="faq__mark" aria-hidden="true"></span></summary>
+        <div class="faq__body body muted">
+          Most don’t, which is exactly why Vivid discloses it by default on the first
+          turn. You can change the wording; you can’t remove the setting without an
+          explicit policy flag on your account.
+        </div>
+      </details>
+
+      <details class="faq__row">
+        <summary><span class="headline">What happens when it doesn’t know?</span><span class="faq__mark" aria-hidden="true"></span></summary>
+        <div class="faq__body body muted">
+          It says so, then follows your escalation rule — warm transfer with a spoken
+          summary, a callback booking, or a ticket. It won’t improvise an answer about
+          your refund policy.
+        </div>
+      </details>
+
+      <details class="faq__row">
+        <summary><span class="headline">How fast is it, really?</span><span class="faq__mark" aria-hidden="true"></span></summary>
+        <div class="faq__body body muted">
+          312&nbsp;ms median speech-to-speech, 480&nbsp;ms at p95 on US and EU edges.
+          Tool calls add whatever your API adds — Vivid fills the gap by speaking
+          instead of leaving dead air.
+        </div>
+      </details>
+
+      <details class="faq__row">
+        <summary><span class="headline">Can I use my own voice?</span><span class="faq__mark" aria-hidden="true"></span></summary>
+        <div class="faq__body body muted">
+          Yes — 90 seconds of clean audio plus recorded consent from the speaker.
+          Cloned voices are locked to your workspace and can’t be exported.
+        </div>
+      </details>
+
+      <details class="faq__row">
+        <summary><span class="headline">Where does the audio live?</span><span class="faq__mark" aria-hidden="true"></span></summary>
+        <div class="faq__body body muted">
+          In the region you pick — US, EU or AU. PII is redacted before storage,
+          retention is yours to set from 0 to 365 days, and deletion is verifiable
+          through the audit log.
+        </div>
+      </details>
+
+      <details class="faq__row">
+        <summary><span class="headline">Does it work with our phone system?</span><span class="faq__mark" aria-hidden="true"></span></summary>
+        <div class="faq__body body muted">
+          If it speaks SIP, yes. Native connectors cover Twilio, Vonage and Telnyx;
+          everything else attaches through a trunk with no change to your carrier.
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════ FINAL CTA ══════════════════ -->
+<section class="section" id="cta">
+  <div class="shell">
+    <div class="finale reveal">
+      <div class="wave wave--finale" data-bars="60" aria-hidden="true"></div>
+      <h2 class="display-xxl">Your phone<br />is ringing.</h2>
+      <p class="body-lg muted finale__sub">
+        100 free minutes. No card. Your first agent answering in about six minutes.
+      </p>
+      <div class="hero__cta">
+        <a class="btn btn--primary btn--lg" href="#">Start free</a>
+        <a class="btn btn--secondary btn--lg" href="#">Talk to sales</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ══════════════════ FOOTER ══════════════════ -->
+<footer class="footer">
+  <div class="shell footer__grid">
+    <div class="footer__brand">
+      <a class="wordmark" href="#top" aria-label="Vivid home">
+        <span class="wordmark__glyph" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <span class="wordmark__text">Vivid</span>
+      </a>
+      <p class="caption muted">Voice agents that finish the call.</p>
+    </div>
+
+    <nav class="footer__col" aria-label="Product">
+      <p class="footer__h caption">Product</p>
+      <a href="#platform">Platform</a>
+      <a href="#voices">Voices</a>
+      <a href="#pricing">Pricing</a>
+      <a href="#demo">Live demo</a>
+      <a href="#">Changelog</a>
+    </nav>
+
+    <nav class="footer__col" aria-label="Developers">
+      <p class="footer__h caption">Developers</p>
+      <a href="#">Documentation</a>
+      <a href="#">TypeScript SDK</a>
+      <a href="#">Python SDK</a>
+      <a href="#">API reference</a>
+      <a href="#">Status</a>
+    </nav>
+
+    <nav class="footer__col" aria-label="Company">
+      <p class="footer__h caption">Company</p>
+      <a href="#">About</a>
+      <a href="#">Careers</a>
+      <a href="#">Customers</a>
+      <a href="#">Blog</a>
+      <a href="#">Contact</a>
+    </nav>
+
+    <nav class="footer__col" aria-label="Legal">
+      <p class="footer__h caption">Legal</p>
+      <a href="#">Privacy</a>
+      <a href="#">Terms</a>
+      <a href="#">DPA</a>
+      <a href="#">Security</a>
+      <a href="#">Responsible AI</a>
+    </nav>
+  </div>
+
+  <div class="shell footer__base">
+    <p class="micro muted">© 2026 Vivid Labs, Inc. All rights reserved.</p>
+    <p class="micro muted">SOC 2 Type II · HIPAA · GDPR</p>
+  </div>
+</footer>
+
+<script src="main.js"></script>
+</body>
+</html>
