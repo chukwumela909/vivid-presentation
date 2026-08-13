@@ -1,0 +1,12 @@
+{
+  "name": "vivid-presentation",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Landing page for Vivid, a voice AI agent",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
