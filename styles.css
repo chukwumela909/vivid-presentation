@@ -1043,7 +1043,7 @@ a {
   .callgrid { grid-template-columns: minmax(0, 1fr); }
 
   .nav__links { display: none; }
-  .nav__signin { display: none; }
+  .nav__try { display: none; }
   .nav__burger { display: flex; }
   .nav__actions { margin-left: auto; }
 
