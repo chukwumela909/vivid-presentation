@@ -5,7 +5,8 @@
       "name": "vivid",
       "runtimeExecutable": "node",
       "runtimeArgs": [".claude/serve.mjs"],
-      "port": 4173
+      "port": 4173,
+      "autoPort": true
     }
   ]
 }

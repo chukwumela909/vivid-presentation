@@ -1083,6 +1083,130 @@ a {
   .tab { min-height: 44px; }
 }
 
+/* ============================================================
+   voice session limit — sits directly above the orb widget
+   (orb: 88px canvas + status pill, fixed right 14px / bottom 14px)
+   ============================================================ */
+.vsession {
+  position: fixed;
+  right: 14px;
+  bottom: 130px; /* clears the 88px orb, its status pill and the 14px inset */
+  z-index: 2147483001;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--s-xs);
+  width: 300px;
+  max-width: calc(100vw - 28px);
+  pointer-events: none;
+  font-family: var(--font-body);
+  font-feature-settings: var(--inter-features);
+}
+
+.vsession__toast {
+  position: relative;
+  width: 100%;
+  padding: var(--s-sm) var(--s-md);
+  padding-right: var(--s-xl);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  backdrop-filter: blur(12px);
+  box-shadow: var(--lift-2);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(6px) scale(0.98);
+  transition: opacity 0.24s ease, transform 0.24s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* only a visible toast may take clicks */
+.vsession__toast.is-in { opacity: 1; transform: none; pointer-events: auto; }
+
+.vsession__title {
+  margin: 0 0 2px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.vsession__body {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ink-muted);
+}
+
+.vsession__again {
+  margin-top: var(--s-xs);
+  padding: 7px 12px;
+  border-radius: var(--r-pill);
+  background: var(--primary);
+  color: var(--on-primary);
+  font-size: 12.5px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+}
+
+.vsession__again:hover { opacity: 0.88; }
+
+.vsession__close {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--r-full);
+  color: var(--ink-muted);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.vsession__close:hover { color: var(--ink); background: var(--surface-2); }
+
+.vsession__clock {
+  position: relative;
+  display: flex;
+  align-items: baseline;
+  gap: 5px;
+  padding: 5px 11px 7px;
+  overflow: hidden;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-pill);
+  background: color-mix(in srgb, var(--surface-1) 92%, transparent);
+  backdrop-filter: blur(12px);
+}
+
+.vsession__time {
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.vsession__label {
+  font-size: 11px;
+  color: var(--ink-muted);
+}
+
+/* thin drain line across the bottom of the pill */
+.vsession__bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 2px;
+  transform: scaleX(var(--p, 1));
+  transform-origin: left;
+  background: var(--grad-violet);
+  transition: transform 0.25s linear, background 0.3s ease;
+}
+
+.vsession__clock[data-tone="low"] .vsession__bar { background: var(--grad-orange); }
+.vsession__clock[data-tone="low"] .vsession__time { color: var(--grad-orange); }
+.vsession__clock[data-tone="out"] .vsession__bar { background: var(--grad-coral); }
+.vsession__clock[data-tone="out"] .vsession__time { color: var(--grad-coral); }
+
 /* ---------- reduced motion ---------- */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
@@ -1093,4 +1217,5 @@ a {
   }
   .reveal { opacity: 1; transform: none; }
   .transcript li { opacity: 1; transform: none; }
+  .vsession__toast { opacity: 1; transform: none; }
 }
