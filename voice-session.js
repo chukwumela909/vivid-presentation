@@ -1,7 +1,8 @@
 /* ============================================================
    Vivid — voice session limits
-   Wraps the embedded orb widget: one session lasts five minutes,
-   and there is no limit on how many sessions a visitor can start.
+   Wraps the embedded orb widget: one session lasts two minutes
+   (data-minutes overrides), and there is no limit on how many
+   sessions a visitor can start.
    Must load BEFORE widget.js — it opens the widget's shadow root
    on creation, which can only be done before the orb is built.
    ============================================================ */
@@ -9,7 +10,7 @@
   'use strict';
 
   // data-minutes on this script tag overrides the cap
-  var minutes = parseFloat((document.currentScript || {}).dataset ? document.currentScript.dataset.minutes : '') || 5;
+  var minutes = parseFloat((document.currentScript || {}).dataset ? document.currentScript.dataset.minutes : '') || 2;
   var LIMIT_MS = Math.max(10, minutes * 60) * 1000;
   var WARN_MS = Math.min(30 * 1000, LIMIT_MS / 4);   // "wrap up" nudge
   var TENSE_MS = Math.min(10 * 1000, LIMIT_MS / 12); // final countdown styling
