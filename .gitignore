@@ -1,0 +1,14 @@
+# Secrets / local config
+env.local
+.env
+.env.*
+
+# Dependencies
+node_modules/
+
+# macOS
+.DS_Store
+
+# Logs
+*.log
+npm-debug.log*
