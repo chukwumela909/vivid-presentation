@@ -30,7 +30,17 @@ createServer(async (req, res) => {
   }
 
   try {
-    const body = await readFile(filePath);
+    let body = await readFile(filePath);
+
+    // ?stub — swap the origin-locked live widget for the local harness, so
+    // the orb, the bridge and the memory can be driven on localhost.
+    if (filePath.endsWith('index.html') && url.searchParams.has('stub')) {
+      body = body.toString().replace(
+        /<script src="https:\/\/platformvivid[^>]*><\/script>/,
+        '<script src=".claude/orb-stub.js"></script>'
+      );
+    }
+
     res.writeHead(200, {
       'Content-Type': TYPES[extname(filePath)] || 'application/octet-stream',
       'Cache-Control': 'no-store',
