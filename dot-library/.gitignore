@@ -1,0 +1,14 @@
+# Model files — large, and FLAME is license-gated (never commit it).
+# See models/README.md for how to fetch them. (models/* not models/, so the
+# negation below can still re-include the README.)
+models/*
+!models/README.md
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# Renders
+out/
