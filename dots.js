@@ -395,6 +395,9 @@
   var rgbT0 = -10;                    /* the moment a session connected, for the shimmer */
   var rgbLen = 2.6;                   /* how long the shimmer lasts */
   var lean = { tx: 0, ty: 0, x: 0, y: 0 };   /* the field leans toward the pointer */
+  var coreN = 0;                      /* how many dots are the sphere; the rest are dust */
+  var spinAngle = 0;                  /* the sphere's continuous rotation */
+  var lastT = 0;
   var spin = 0, spin0 = 0;
   var holdUntil = 0;                  /* when the current formation should go */
   var raf = 0;
@@ -408,8 +411,10 @@
     arcX = new Float32Array(n); arcY = new Float32Array(n); arcZ = new Float32Array(n);
     w1 = new Float32Array(n * 3); w2 = new Float32Array(n * 3);
     ph1 = new Float32Array(n * 3); ph2 = new Float32Array(n * 3);
+    tint = new Uint8Array(n);
 
     var rand = rng(9);
+    for (var q = 0; q < n; q++) tint[q] = (rand() * TINTS.length) | 0;
     for (var i = 0; i < n * 3; i++) {
       w1[i] = (0.25 + rand() * 0.35) * 6.2832 * 0.5;
       w2[i] = (0.70 + rand() * 0.60) * 6.2832 * 0.5;
@@ -445,6 +450,7 @@
     var R = 0.185 * Math.min(w, h);
     var GOLD = Math.PI * (1 + Math.sqrt(5));
     var shell = Math.round(n * 0.58);
+    coreN = shell;
     var i;
 
     for (i = 0; i < shell; i++) {
@@ -523,9 +529,11 @@
   /* ------------------------------------------------------------
      the frame
      ------------------------------------------------------------ */
+  var debugTimeOff = 0;   /* ?debug only: lets tests step time without rAF */
+
   function frame() {
     raf = requestAnimationFrame(frame);
-    var t = performance.now() / 1000;
+    var t = performance.now() / 1000 + debugTimeOff;
 
     stepJob();
 
@@ -573,6 +581,28 @@
     s.fillRect(0, 0, S, S);
   })();
 
+  /* every dot's own everyday colour: a soft tint, assigned once and kept —
+     the field reads as colour without ever shouting */
+  var TINTS = (function () {
+    var out = [];
+    for (var hdeg = 0; hdeg < 360; hdeg += 24) {
+      var c = document.createElement('canvas');
+      var S = 32;
+      c.width = c.height = S;
+      var s = c.getContext('2d');
+      var g = s.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
+      g.addColorStop(0, 'hsla(' + hdeg + ',62%,82%,1)');
+      g.addColorStop(0.62, 'hsla(' + hdeg + ',58%,74%,1)');
+      g.addColorStop(1, 'hsla(' + hdeg + ',58%,74%,0)');
+      s.fillStyle = g;
+      s.fillRect(0, 0, S, S);
+      out.push(c);
+    }
+    return out;
+  })();
+
+  var tint = null;                    /* per-dot index into TINTS */
+
   /* ...and a ring of coloured ones, for the moment a session connects */
   var HUES = (function () {
     var out = [];
@@ -619,18 +649,24 @@
     var breath = 1;
     var lift = 1 + level * 0.55;
     if (resting) {
-      breath = 1 + 0.022 * Math.sin(t * 1.15) + level * 0.34;
+      breath = 1 + 0.022 * Math.sin(t * 1.15);   /* voice now moves dots radially, per dot */
       lift = 1 + level * 0.85;
     }
 
-    /* connecting: the field spirals about the middle — faster toward the
-       centre, a vortex — and unwinds again once the line is open */
+    /* The sphere turns — one smooth, continuous rotation in 3D, always in
+       the same direction, on an axis that leans and slowly shifts. At rest
+       it is barely turning; while connecting it spins up, and it eases back
+       down once the line is open. Only the sphere; the dust holds still. */
     swirlAmp += ((phase === 'connecting' ? 1 : 0) - swirlAmp) * 0.05;
-    var swirling = swirlAmp > 0.004;
-    var swirlR = 0.24 * Math.min(w, h);
+    var dtF = Math.min(0.05, Math.max(0, t - lastT));
+    lastT = t;
+    spinAngle += dtF * (0.22 + 2.3 * swirlAmp);
+    var tiltNow = 0.42 + 0.28 * Math.sin(t * 0.13);
+    var cosTl = Math.cos(tiltNow), sinTl = Math.sin(tiltNow);
+    var caS = Math.cos(spinAngle), saS = Math.sin(spinAngle);
 
-    /* the moment it connects: a shimmer of colour wobbles through the
-       field, then it settles back to its own white */
+    /* the moment it connects: a wave of colour travels around the ball with
+       that same motion, then it settles back to its own white */
     var rgbK = 0;
     var dtRGB = t - rgbT0;
     if (dtRGB >= 0 && dtRGB < rgbLen) rgbK = Math.sin(Math.min(1, dtRGB / rgbLen) * Math.PI);
@@ -647,21 +683,22 @@
       var y = py[i] + dy * driftAmp - cy;
       var z = pz[i] + dz * driftAmp;
 
-      if (swirling) {
-        var rr = Math.sqrt(x * x + y * y) + 1e-3;
-        var ang = swirlAmp * t * 1.15 * (1.5 / (0.35 + rr / swirlR));
-        var ca = Math.cos(ang), sa = Math.sin(ang);
-        var nx = x * ca - y * sa;
-        y = x * sa + y * ca;
+      if (resting && i < coreN) {
+        /* lean the axis, turn the ball around it, lean back — the same
+           angle for every dot, so the sphere moves as one body */
+        var ty2 = y * cosTl - z * sinTl;
+        var tz2 = y * sinTl + z * cosTl;
+        var nx = x * caS + tz2 * saS;
+        tz2 = -x * saS + tz2 * caS;
         x = nx;
-      }
+        y = ty2 * cosTl + tz2 * sinTl;
+        z = -ty2 * sinTl + tz2 * cosTl;
 
-      if (rgbK > 0) {
-        /* a radial wobble rides along with the colour */
-        var rw2 = Math.sqrt(x * x + y * y) + 1e-3;
-        var wob = Math.sin(t * 6 + Math.atan2(y, x) * 3) * 4 * rgbK;
-        x += (x / rw2) * wob;
-        y += (y / rw2) * wob;
+        /* the voice breathes through it in 3D: every dot slides out along
+           its own line from the centre and back, each on its own beat —
+           expansion and retraction, not a flat scale */
+        var pulse = 1 + level * (0.20 + 0.17 * Math.sin(t * 4.0 + ph1[a] * 2.2));
+        x *= pulse; y *= pulse; z *= pulse;
       }
 
       x *= breath; y *= breath; z *= breath;
@@ -682,47 +719,26 @@
       var av = alpha * pb[i] * shade * lift;
       if (av <= 0.004) continue;
       var r = DOT_R * persp;
-      if (rgbK > 0.01) {
-        /* colour crossfades in over the white and back out again */
+      var base = TINTS[tint[i]];
+      if (rgbK > 0.01 && !(resting && i >= coreN)) {
+        /* the connect shimmer: full colour crossfades in over the dot's own
+           tint and back out. The hue is not striped by index — it is a wave
+           travelling around the ball, read from where the dot actually is,
+           the same motion the spin has, in colour. The dust sits it out. */
         ctx.globalAlpha = Math.min(1, av * (1 - rgbK * 0.7));
-        ctx.drawImage(sprite, sx[i] - r, sy[i] - r, r * 2, r * 2);
+        ctx.drawImage(base, sx[i] - r, sy[i] - r, r * 2, r * 2);
         ctx.globalAlpha = Math.min(1, av * rgbK);
-        var hue = HUES[(i * 5 + ((t * 9) | 0)) % HUES.length];
-        ctx.drawImage(hue, sx[i] - r, sy[i] - r, r * 2, r * 2);
+        var aRound = Math.atan2(sz[i], sx[i] - cx - lean.x);
+        var huePos = ((aRound / 6.2832 + t * 0.4) % 1 + 1) % 1;
+        ctx.drawImage(HUES[(huePos * HUES.length) | 0], sx[i] - r, sy[i] - r, r * 2, r * 2);
       } else {
         ctx.globalAlpha = Math.min(1, av);
-        ctx.drawImage(sprite, sx[i] - r, sy[i] - r, r * 2, r * 2);
+        ctx.drawImage(base, sx[i] - r, sy[i] - r, r * 2, r * 2);
       }
     }
 
-    ring(t);
-
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-  }
-
-  /* The session clock, drawn the way orb.js drew it — a ring that thins as
-     the ten minutes run down — except this one is made of dots too. */
-  function ring(t) {
-    var S = window.VividSession;
-    if (!S || !S.active) return;
-    var left = S.left();
-    if (left <= 0) return;
-
-    var R = 0.30 * Math.min(w, h) * (1 + level * 0.06);
-    var count = 150;
-    var upto = Math.floor(count * left);
-    var cx = w / 2, cy = h / 2;
-    for (var i = 0; i < upto; i++) {
-      var a = -Math.PI / 2 + (i / count) * Math.PI * 2;
-      var wob = 1 + 0.008 * Math.sin(t * 0.9 + i * 0.35);
-      var x = cx + Math.cos(a) * R * wob;
-      var y = cy + Math.sin(a) * R * wob;
-      /* the leading end fades, so the ring dissolves rather than snaps */
-      var edge = Math.min(1, (upto - i) / 14);
-      ctx.globalAlpha = alpha * 0.5 * edge;
-      ctx.drawImage(sprite, x - 1.1, y - 1.1, 2.2, 2.2);
-    }
   }
 
   var sx = null, sy = null, sz = null;
@@ -733,6 +749,9 @@
   var refit = 0;
 
   function resize() {
+    /* a hidden or prerendered pane can report 0x0; keep the last real size
+       and let the next genuine resize event lay things out */
+    if (!(window.innerWidth > 0) || !(window.innerHeight > 0)) return;
     dpr = Math.min(window.devicePixelRatio || 1, 2);
     var prevW = w, prevH = h;
     w = window.innerWidth;
@@ -755,9 +774,15 @@
        while moving every edge, and the clamps mean whole classes of resize
        land on the same count too. Debounced: a drag fires this a hundred
        times and each re-fit is real work. */
-    if ((w !== prevW || h !== prevH) && Dots.showing && prevW) {
+    if ((w !== prevW || h !== prevH) && prevW) {
       clearTimeout(refit);
-      refit = setTimeout(function () { replay(Dots.showing, { duration: 0.9 }); }, 180);
+      refit = setTimeout(function () {
+        /* re-fit whatever the room holds: the formation, or the resting
+           sphere — its positions are absolute too, and a dot-count change
+           even re-randomizes them */
+        if (Dots.showing) replay(Dots.showing, { duration: 0.9 });
+        else Dots.rest({ duration: 0.9 });
+      }, 180);
     }
   }
 
@@ -1019,10 +1044,66 @@
   /* under ?debug, the transient states can be forced, for eyes and for tests */
   if (DEBUG) {
     Dots._debug = {
-      shimmer: function (secs) { rgbLen = secs || 2.6; rgbT0 = performance.now() / 1000; },
+      shimmer: function (secs) { rgbLen = secs || 2.6; rgbT0 = performance.now() / 1000 + debugTimeOff; },
+      countdown: function () { wantTime = true; nextMark = timeMarks.length; },
+      /* advance the animation by hand — for a hidden pane or a test rig,
+         where requestAnimationFrame never fires */
+      step: function (frames, dt) {
+        for (var k = 0; k < (frames || 1); k++) { debugTimeOff += (dt || 1 / 30); frame(); }
+        if (raf) { cancelAnimationFrame(raf); raf = 0; }
+      },
+      /* the canvas, downscaled, as a PNG data url — proof of pixels */
+      snap: function (width) {
+        var s = (width || 480) / canvas.width;
+        var c2 = document.createElement('canvas');
+        c2.width = Math.round(canvas.width * s);
+        c2.height = Math.round(canvas.height * s);
+        var g = c2.getContext('2d');
+        g.fillStyle = '#050506';
+        g.fillRect(0, 0, c2.width, c2.height);
+        g.drawImage(canvas, 0, 0, c2.width, c2.height);
+        return c2.toDataURL('image/png');
+      },
       phase: function (p) { phase = p; }
     };
   }
+
+  /* ------------------------------------------------------------
+     the countdown, occasionally
+     The clock is no fixture. Every couple of minutes — and again inside
+     the last one — the dots take a breath, spell out how much time is
+     left, and gather back into the sphere. Only ever in a quiet moment:
+     nobody talking, nothing else being shown, never over a prompt.
+     ------------------------------------------------------------ */
+  var timeMarks = [480, 360, 240, 120, 60, 30];   /* seconds remaining */
+  var nextMark = 0;
+  var wantTime = false;
+  var quietSince = 0;
+
+  function timeLoop() {
+    var S = window.VividSession;
+    if (!Vivid || !S || !S.active || Vivid.state !== 'live') { wantTime = false; quietSince = 0; return; }
+    var left = S.ms() / 1000;
+    while (nextMark < timeMarks.length && left <= timeMarks[nextMark]) { wantTime = true; nextMark++; }
+    if (!wantTime) return;
+
+    var quiet = Vivid.phase === 'listening'
+      && Vivid.levels.mic < 0.09 && Vivid.levels.agent < 0.09
+      && !Dots.showing && !job && !seg;
+    var now = performance.now() / 1000;
+    if (!quiet) { quietSince = 0; return; }
+    if (!quietSince) { quietSince = now; return; }
+    if (now - quietSince < 0.7) return;            /* let the quiet settle first */
+
+    wantTime = false;
+    quietSince = 0;
+    var m = Math.floor(left / 60), s2 = Math.round(left % 60);
+    if (s2 === 60) { m++; s2 = 0; }
+    show({ kind: 'word', text: m + ':' + (s2 < 10 ? '0' : '') + s2 },
+         { hold: 2.6, duration: 1.1 });
+  }
+  setInterval(timeLoop, 500);
+  if (Vivid) Vivid.on('open', function () { nextMark = 0; wantTime = false; quietSince = 0; });
 
   /* the session's moods, straight onto the field: connecting spirals,
      the moment of connection shimmers, speaking swells (via levels above) */
