@@ -310,23 +310,31 @@
        gold, and the dots simply take its colours */
     hand: function (c, W, H, r) { emojiInto(c, '👋', W / 2, H / 2, r * 2.1); },
 
-    /* the WorldStreet W: two strokes, flat-topped, the middle peak held
-       below the shoulders — in its own yellow */
+    /* The WorldStreet mark, in its own geometry and its own yellow: two
+       solid wedges, flat across the top, meeting at a point and tapering
+       to two feet. Not a drawn W — these are the coordinates the mark is
+       actually made of, so the dots fill the real thing. */
     worldstreet: function (c, W, H, r) {
+      var VW = 435.32, VH = 245.73;              /* the mark's own box */
+      var wedges = [
+        [[0, 0], [159.68, 0], [217.66, 102.5], [139.01, 245.73]],
+        [[435.32, 0], [275.64, 0], [217.66, 102.5], [296.32, 245.73]]
+      ];
+      /* a wide mark of solid fill spreads the field thin — held in from
+         the edges it reads as one object rather than as a haze */
+      var s = Math.min(W * 0.72 / VW, H * 0.72 / VH);
       c.save();
-      c.strokeStyle = '#f5c518';
-      c.lineWidth = r * 0.34;
-      c.lineJoin = 'miter';
-      c.lineCap = 'butt';
-      c.miterLimit = 4;
-      var x = W / 2, y = H / 2;
-      function pt(dx, dy) { return [x + dx * r, y + dy * r]; }
-      var p = [pt(-0.92, -0.72), pt(-0.46, 0.74), pt(0, -0.22),
-               pt(0.46, 0.74), pt(0.92, -0.72)];
-      c.beginPath();
-      c.moveTo(p[0][0], p[0][1]);
-      for (var k = 1; k < p.length; k++) c.lineTo(p[k][0], p[k][1]);
-      c.stroke();
+      c.translate((W - VW * s) / 2, (H - VH * s) / 2);
+      c.scale(s, s);
+      c.fillStyle = '#f8c828';
+      for (var k = 0; k < wedges.length; k++) {
+        var p = wedges[k];
+        c.beginPath();
+        c.moveTo(p[0][0], p[0][1]);
+        for (var j = 1; j < p.length; j++) c.lineTo(p[j][0], p[j][1]);
+        c.closePath();
+        c.fill();
+      }
       c.restore();
     },
     star: function (c, W, H, r) { poly(c, W, H, r, 5, 0.45); },
@@ -399,7 +407,7 @@
 
   /* most shapes are happy in a square; the mark with a ring around it
      needs the room either side */
-  var SHAPE_BOX = { loveworld: [380, 300] };
+  var SHAPE_BOX = { loveworld: [380, 300], worldstreet: [420, 240] };
 
   function targetShape(name) {
     var fn = SHAPES[name];
