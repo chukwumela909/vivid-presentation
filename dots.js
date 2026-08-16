@@ -144,6 +144,9 @@
   }
 
   var FONT = 'ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  /* Emoji arrive as colour artwork, which is exactly what a target wants:
+     the dots take the glyph's own colours and none of its background. */
+  var EMOJI_FONT = '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif';
 
   /* The raster is walked pixel by pixel to build the sampling table, so its
      area — not its width — is the cost. A tall phone screen would otherwise
@@ -303,28 +306,26 @@
       c.fillText('LoveWorld', cx, ty);
     },
 
-    hand: function (c, W, H, r) {
-      /* an open palm mid-wave, leaning the way a wave leans */
+    /* the waving hand, as the emoji itself — it is already drawn, already
+       gold, and the dots simply take its colours */
+    hand: function (c, W, H, r) { emojiInto(c, '👋', W / 2, H / 2, r * 2.1); },
+
+    /* the WorldStreet W: two strokes, flat-topped, the middle peak held
+       below the shoulders — in its own yellow */
+    worldstreet: function (c, W, H, r) {
       c.save();
-      c.translate(W / 2, H / 2);
-      c.rotate(-0.22);
-      var s = r / 96;
-      c.lineCap = 'round';
-      c.lineWidth = 22 * s;
+      c.strokeStyle = '#f5c518';
+      c.lineWidth = r * 0.34;
+      c.lineJoin = 'miter';
+      c.lineCap = 'butt';
+      c.miterLimit = 4;
+      var x = W / 2, y = H / 2;
+      function pt(dx, dy) { return [x + dx * r, y + dy * r]; }
+      var p = [pt(-0.92, -0.72), pt(-0.46, 0.74), pt(0, -0.22),
+               pt(0.46, 0.74), pt(0.92, -0.72)];
       c.beginPath();
-      if (c.ellipse) c.ellipse(0, 44 * s, 42 * s, 46 * s, 0, 0, 6.2832);
-      else c.arc(0, 44 * s, 44 * s, 0, 6.2832);
-      c.fill();
-      var fx = [-39, -13, 13, 39], fh = [82, 104, 110, 90];
-      for (var k = 0; k < 4; k++) {
-        c.beginPath();
-        c.moveTo(fx[k] * s, 14 * s);
-        c.lineTo(fx[k] * 1.1 * s, (14 - fh[k]) * s);
-        c.stroke();
-      }
-      c.beginPath();
-      c.moveTo(-38 * s, 52 * s);
-      c.lineTo(-84 * s, 12 * s);
+      c.moveTo(p[0][0], p[0][1]);
+      for (var k = 1; k < p.length; k++) c.lineTo(p[k][0], p[k][1]);
       c.stroke();
       c.restore();
     },
@@ -356,6 +357,44 @@
       i ? c.lineTo(vx, vy) : c.moveTo(vx, vy);
     }
     c.closePath(); c.fill();
+  }
+
+  /* An emoji is colour artwork with a transparent ground, so it needs no
+     special handling at all: draw the glyph, and the density map picks up
+     its shape while the chroma channel picks up its colours. Nothing of
+     the box it came in survives, because there was never a box. */
+  function emojiInto(c, ch, x, y, box) {
+    c.save();
+    c.textAlign = 'center';
+    c.textBaseline = 'alphabetic';
+
+    /* An emoji does not sit where the text box says it does — its artwork
+       hangs around the baseline differently in every glyph, and "middle"
+       leaves a wave riding high with a drift of empty room beneath it. So
+       measure the ink itself, scale it to the box, and centre on that. */
+    function ink(size) {
+      c.font = Math.round(size) + 'px ' + EMOJI_FONT;
+      var m = c.measureText(ch);
+      var asc = m.actualBoundingBoxAscent, desc = m.actualBoundingBoxDescent;
+      if (!(asc > 0)) { asc = size * 0.78; desc = size * 0.06; }
+      var wide = (m.actualBoundingBoxLeft || 0) + (m.actualBoundingBoxRight || 0);
+      return { w: wide > 0 ? wide : m.width || size, h: asc + desc, asc: asc, desc: desc };
+    }
+
+    var it = ink(box);
+    var fit = box / Math.max(it.w, it.h, 1);
+    if (fit < 0.99 || fit > 1.01) it = ink(box * fit);
+
+    c.fillText(ch, x, y + (it.asc - it.desc) / 2);
+    c.restore();
+  }
+
+  function targetEmoji(ch) {
+    ch = String(ch || '').trim().slice(0, 8);
+    if (!ch) return null;
+    return rasterize(function (c, W, H) {
+      emojiInto(c, ch, W / 2, H / 2, Math.min(W, H) * 0.82);
+    }, 300, 300);
   }
 
   /* most shapes are happy in a square; the mark with a ring around it
@@ -1047,6 +1086,7 @@
     if (spec.kind === 'word') map = targetText(String(spec.text || '').trim().slice(0, 40));
     else if (spec.kind === 'neu') map = targetText('NEU 26', [{ t: 'NEU ', l: 0.52 }, { t: '26', l: 1, rgb: true }]);
     else if (spec.kind === 'shape') map = targetShape(spec.shape);
+    else if (spec.kind === 'emoji') map = targetEmoji(spec.emoji);
     else if (spec.kind === 'image') map = targetImage(spec.image);
 
     if (!map) { note('nothing to show for', spec); return false; }
@@ -1125,6 +1165,10 @@
 
     shape: function (name, opts) {
       return show({ kind: 'shape', shape: String(name || '').toLowerCase() }, opts);
+    },
+
+    emoji: function (ch, opts) {
+      return show({ kind: 'emoji', emoji: ch }, opts);
     },
 
     image: function (img, opts) {
@@ -1338,6 +1382,7 @@
     { kind: 'shape', shape: 'hand' },
     { kind: 'shape', shape: 'loveworld' },
     { kind: 'word', text: 'Holla' },
+    { kind: 'shape', shape: 'worldstreet' },
     { kind: 'shape', shape: 'heart' },
     { kind: 'word', text: 'tap to talk', invite: true }
   ];
@@ -1453,9 +1498,10 @@
       properties: {
         show: {
           type: 'string',
-          enum: ['word', 'shape', 'burst', 'auto', 'rest'],
+          enum: ['word', 'shape', 'emoji', 'burst', 'auto', 'rest'],
           description:
             'word — the dots spell something (give text). shape — they form a shape (give shape). ' +
+            'emoji — they become an emoji, in its own colours (give emoji). ' +
             'burst — they scatter across the whole screen. auto — they cycle on their own until told otherwise. ' +
             'rest — they gather back into the sphere, which is where they live when nothing is being shown.'
         },
@@ -1468,8 +1514,17 @@
         },
         shape: {
           type: 'string',
-          enum: ['loveworld', 'heart', 'hand', 'circle', 'ring', 'star', 'spiral', 'hexagon', 'triangle'],
-          description: 'shape only: which shape to form.'
+          enum: ['loveworld', 'worldstreet', 'heart', 'hand', 'circle', 'ring',
+                 'star', 'spiral', 'hexagon', 'triangle'],
+          description:
+            'shape only: which shape to form. loveworld is the LoveWorld mark, in gold; ' +
+            'worldstreet is the WorldStreet W, in its yellow; hand is a waving hand.'
+        },
+        emoji: {
+          type: 'string',
+          description:
+            'emoji only: a single emoji character — any one you like. It is formed in its own ' +
+            'colours, so pick the one that says what you mean.'
         }
       },
       required: ['show'],
@@ -1569,6 +1624,7 @@
     switch (args.show) {
       case 'word': return Dots.word(args.text);
       case 'shape': return Dots.shape(args.shape || 'circle');
+      case 'emoji': return Dots.emoji(args.emoji);
       case 'burst': return Dots.burst();
       case 'auto': return Dots.auto(true);
       case 'rest': case 'clear': return Dots.rest();
@@ -1612,6 +1668,8 @@
     { re: /\bvivid\b|\bmy name\b|\bwho i am\b/, spec: { kind: 'word', text: 'vivid' } },
     { re: /\bhello\b|\bhi\b|\bhey\b/, spec: { kind: 'word', text: 'Hello' } },
     { re: /\bholla\b|\bhola\b/, spec: { kind: 'word', text: 'Holla' } },
+    { re: /\bworld\s*street\b|\bworldstreet\b/,
+      spec: { kind: 'shape', shape: 'worldstreet' } },
     { re: /\blove\s*world\b|\bloveworld\b|\bchurch\b|\bministry\b/,
       spec: { kind: 'shape', shape: 'loveworld' } },
     { re: /\blove\b|\bheart\b/, spec: { kind: 'shape', shape: 'heart' } },

@@ -99,10 +99,16 @@ The agent rearranges it with the `show_dots` tool — merged into the session
 the same way `run_task` is:
 
 - `word` — the dots spell out short text
-- `shape` — loveworld, heart, hand, circle, ring, star, spiral, hexagon, triangle
+- `shape` — loveworld, worldstreet, heart, hand, circle, ring, star, spiral, hexagon, triangle
+- `emoji` — any single emoji, formed in its own colours
 - `burst` — every dot flung across the whole screen
 - `auto` — an ambient cycle that runs by itself
 - `rest` — back to the sphere
+
+An emoji needs no artwork of ours: it is colour on a transparent ground, so
+the glyph is drawn and the dots take its shape and its colours, with nothing
+of the box it came in — there was never a box. The waving hand is the emoji
+itself, motion lines and all.
 
 `set_theme` turns the room over: `dark` is a black room and dots of white
 light, `light` is a paper-white room and dots of ink. Neither side is pure —
