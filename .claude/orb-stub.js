@@ -243,6 +243,17 @@
         });
       }
 
+      /* ...and on the second, start background work, so tasks.js and its
+         worker can be seen carrying a result back into the session */
+      if (turn === 2) {
+        output.push({
+          type: 'function_call',
+          name: 'run_task',
+          call_id: 'call_stub_' + turn,
+          arguments: JSON.stringify({ task: 'timer', seconds: 4 })
+        });
+      }
+
       farEndSend({ type: 'response.done', response: { output: output } });
     });
   }

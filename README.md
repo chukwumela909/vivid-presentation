@@ -6,12 +6,14 @@ landing page, no copy, no navigation. You tap the orb and it talks to you.
 No build step and no dependencies.
 
 ```
-index.html         the shell: a canvas, a button, five scripts
+index.html         the shell: a canvas, a button, six scripts
 styles.css         the room the orb sits in
 vivid-bridge.js    the seam between our pixels and the embedded widget
 orb.js             the orb — everything that moves
 memory.js          who it is talking to, kept in localStorage
-voice-session.js   two minutes a session, unlimited sessions
+tasks.js           background work the agent can start mid-conversation
+task-worker.js     the Web Worker that actually does it
+voice-session.js   ten minutes a session, unlimited sessions
 ```
 
 ## Run it
@@ -77,11 +79,33 @@ Everything is stored in `localStorage` under `vivid:memory`, on that device and
 nowhere else — nothing is sent anywhere. `VividMemory.read()` and
 `VividMemory.forget()` are there for a presentation reset.
 
+## Background tasks
+
+`tasks.js` gives the agent hands that keep working while it talks. It rides
+the same two seams as memory:
+
+1. once memory's amendment is acknowledged (`session.updated`), it merges a
+   `run_task` tool onto the session's tools — never replacing anything
+2. when the agent calls it, the work goes to a Web Worker
+   (`task-worker.js`, off the main thread — the orb never drops a frame)
+   and the tool answers `Started.` immediately, via the same outgoing
+   rewrite that memory uses, so the conversation never stalls
+3. when the worker finishes, the result waits for the gap after
+   `response.done`, then lands as a system item followed by a
+   `response.create` — the agent tells the user in its own words,
+   mid-session, unprompted
+
+Two tasks ship as demos: `timer` ("give me thirty seconds, then tell me")
+and `nth_prime` (deliberately heavy, to show the work really is off-thread).
+Adding one is a function in `task-worker.js` plus a line in the tool schema
+in `tasks.js`. Tasks live and die with the session — hanging up drops
+whatever was still running.
+
 ## Notes
 
 - The character of the conversation is the `PERSONA` string at the top of
   `memory.js`. Edit the prose, not the plumbing.
-- A session is two minutes (`data-minutes` on the `voice-session.js` tag);
+- A session is ten minutes (`data-minutes` on the `voice-session.js` tag);
   there is no cap on how many. It is drawn as a thinning arc around the orb
   and never announced.
 - `DESIGN.md` documents the design system of the marketing page this replaced.
