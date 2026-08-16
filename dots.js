@@ -139,15 +139,33 @@
     return [rw, rh];
   }
 
-  function targetText(text) {
+  /* `parts` lets a phrase carry emphasis: [{t:'NEU ', l:0.55}, {t:'26', l:1}]
+     — brighter parts get both brighter dots and more of them, so they glow */
+  function targetText(text, parts) {
     var size = rasterSize(420, h / Math.max(w, 1));
     var rw = size[0], rh = size[1];
     return rasterize(function (c, W, H) {
-      var size = fitFont(c, text, W * 0.88, H * 0.72);
-      c.font = '700 ' + size + 'px ' + FONT;
-      c.textAlign = 'center';
+      var px2 = fitFont(c, text, W * 0.88, H * 0.72);
+      c.font = '700 ' + px2 + 'px ' + FONT;
       c.textBaseline = 'middle';
-      c.fillText(text, W / 2, H / 2);
+      if (!parts) {
+        c.textAlign = 'center';
+        c.fillText(text, W / 2, H / 2);
+        return;
+      }
+      c.textAlign = 'left';
+      var widths = [], total = 0, k;
+      for (k = 0; k < parts.length; k++) {
+        widths[k] = c.measureText(parts[k].t).width;
+        total += widths[k];
+      }
+      var x = (W - total) / 2;
+      for (k = 0; k < parts.length; k++) {
+        var g = Math.round(255 * (parts[k].l != null ? parts[k].l : 1));
+        c.fillStyle = 'rgb(' + g + ',' + g + ',' + g + ')';
+        c.fillText(parts[k].t, x, H / 2);
+        x += widths[k];
+      }
     }, rw, rh);
   }
 
@@ -444,33 +462,25 @@
      them are the same dots — the dust is simply the part of the word that
      is not being spelled yet. Fibonacci spacing covers the shell evenly,
      with no seam and no crowded pole. */
+  /* The resting state: every dot on the orb. No dust, no halo — when a word
+     or the clock forms, it pours out of the orb and gathers back into it,
+     never out of a scatter across the room. Fibonacci spacing covers the
+     shell evenly, with no seam and no crowded pole. */
   function sphereInto(ax, ay, az, ab, n, rand) {
-    var R = 0.185 * Math.min(w, h);
+    var R = 0.2 * Math.min(w, h);
     var GOLD = Math.PI * (1 + Math.sqrt(5));
-    var shell = Math.round(n * 0.58);
-    coreN = shell;
-    var i;
+    coreN = n;
 
-    for (i = 0; i < shell; i++) {
+    for (var i = 0; i < n; i++) {
       var k = i + 0.5;
-      var phi = Math.acos(1 - 2 * k / shell);
+      var phi = Math.acos(1 - 2 * k / n);
       var theta = GOLD * k;
       var jitter = 0.94 + rand() * 0.12;
       var sinp = Math.sin(phi);
       ax[i] = w / 2 + R * jitter * sinp * Math.cos(theta);
       ay[i] = h / 2 + R * jitter * Math.cos(phi);
       az[i] = R * jitter * sinp * Math.sin(theta);
-      if (ab) ab[i] = 0.5 + rand() * 0.32;
-    }
-
-    /* the dust: thinner the further it drifts from the middle */
-    for (; i < n; i++) {
-      var a = rand() * Math.PI * 2;
-      var rad = R * (1.35 + Math.pow(rand(), 0.7) * 3.4);
-      ax[i] = w / 2 + Math.cos(a) * rad;
-      ay[i] = h / 2 + Math.sin(a) * rad * 0.82;
-      az[i] = (rand() * 2 - 1) * R * 1.2;
-      if (ab) ab[i] = 0.05 + rand() * 0.13;
+      if (ab) ab[i] = 0.5 + rand() * 0.34;
     }
   }
 
@@ -820,6 +830,7 @@
     opts = opts || {};
     var map = null;
     if (spec.kind === 'word') map = targetText(String(spec.text || '').trim().slice(0, 40));
+    else if (spec.kind === 'neu') map = targetText('NEU 26', [{ t: 'NEU ', l: 0.52 }, { t: '26', l: 1 }]);
     else if (spec.kind === 'shape') map = targetShape(spec.shape);
     else if (spec.kind === 'image') map = targetImage(spec.image);
 
@@ -1051,6 +1062,34 @@
   }
 
   /* ------------------------------------------------------------
+     ambient — the room entertains itself
+     Before anyone taps, and after a session ends, the orb does not just
+     sit there: every little while it becomes something — NEU 26 with the
+     26 glowing, a shape, a word — and gathers back. The moment a session
+     starts it snaps back to being the orb and stays out of the way.
+     ------------------------------------------------------------ */
+  var AMBIENT = [
+    { kind: 'neu' },
+    { kind: 'shape', shape: 'circle' },
+    { kind: 'word', text: 'vivid' },
+    { kind: 'shape', shape: 'heart' },
+    { kind: 'neu' },
+    { kind: 'shape', shape: 'spiral' },
+    { kind: 'shape', shape: 'star' }
+  ];
+  var amb = { i: 0, last: 0 };
+
+  setInterval(function ambientLoop() {
+    var now = performance.now() / 1000;
+    if (!Vivid || Vivid.phase !== 'idle' || auto.on) { amb.last = now + 3; return; }
+    if (Dots.showing || job || seg || !resting) return;
+    if (!amb.last) amb.last = now;
+    if (now - amb.last < 9) return;
+    amb.last = now;
+    show(AMBIENT[amb.i++ % AMBIENT.length], { hold: 4.5 });
+  }, 1000);
+
+  /* ------------------------------------------------------------
      the countdown, occasionally
      The clock is no fixture. Every couple of minutes — and again inside
      the last one — the dots take a breath, spell out how much time is
@@ -1087,11 +1126,14 @@
   setInterval(timeLoop, 500);
   if (Vivid) Vivid.on('open', function () { nextMark = 0; wantTime = false; quietSince = 0; });
 
-  /* the session's moods, straight onto the field: connecting spirals,
-     the moment of connection shimmers, speaking swells (via levels above) */
+  /* the session's moods, straight onto the field: connecting spins up in
+     colour, connected settles to white, speaking swells (via levels above) */
   if (Vivid) {
     Vivid.on('phase', function (change) {
       phase = change.state === 'connecting' ? 'connecting' : change.state;
+      /* a session starting reclaims the room: whatever the ambient cycle
+         had formed gathers back into the orb before the spin-up */
+      if (phase === 'connecting' && Dots.showing) Dots.rest({ duration: 0.9 });
       start();
     });
   }
