@@ -210,7 +210,29 @@
       return;
     }
 
-    if (event.type === 'response.create') speak();
+    if (event.type === 'response.cancel') {
+      if (!speaking) return;
+      clearTimeout(speaking);
+      speaking = 0;
+      hush();
+      console.info('[stub] response cancelled');
+      farEndSend({ type: 'response.done', response: { status: 'cancelled', output: [] } });
+      return;
+    }
+
+    if (event.type === 'response.create') {
+      var override = event.response && event.response.instructions;
+      if (override) console.info('[stub] response instructions:\n' + override);
+      speak();
+    }
+  }
+
+  var speaking = 0;   // the turn in flight, so response.cancel can end it
+
+  function hush() {
+    if (!actx || !gain) return;
+    gain.gain.cancelScheduledValues(actx.currentTime);
+    gain.gain.setValueAtTime(0, actx.currentTime);
   }
 
   /* a spoken turn: modulate the tone so the level meter has something to
@@ -231,7 +253,8 @@
     }
     gain.gain.linearRampToValueAtTime(0, start + seconds);
 
-    after(seconds * 1000, function () {
+    speaking = setTimeout(function () {
+      speaking = 0;
       var output = [{ type: 'message', role: 'assistant' }];
 
       if (turn === 1) {
@@ -255,11 +278,21 @@
       }
 
       farEndSend({ type: 'response.done', response: { output: output } });
-    });
+    }, seconds * 1000);
+    timers.push(speaking);
   }
 
   window.__orbStub = {
     tap: function () { canvas.click(); },
+    /* put words in the room's mouth: the transcript of a spoken turn,
+       which is what opening.js listens to for its cue */
+    hear: function (text) {
+      farEndSend({
+        type: 'conversation.item.input_audio_transcription.completed',
+        item_id: 'item_stub_heard',
+        transcript: text
+      });
+    },
     status: function () { return status; },
     fail: function () { set('error'); },
     peek: function () {

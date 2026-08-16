@@ -6,10 +6,11 @@ landing page, no copy, no navigation. You tap the orb and it talks to you.
 No build step and no dependencies.
 
 ```
-index.html         the shell: a canvas, a button, six scripts
+index.html         the shell: a canvas, a button, seven scripts
 styles.css         the room the orb sits in
 vivid-bridge.js    the seam between our pixels and the embedded widget
 orb.js             the orb — everything that moves
+opening.js         the scripted moments, said word for word on cue
 memory.js          who it is talking to, kept in localStorage
 tasks.js           background work the agent can start mid-conversation
 task-worker.js     the Web Worker that actually does it
@@ -105,6 +106,10 @@ whatever was still running.
 
 - The character of the conversation is the `PERSONA` string at the top of
   `memory.js`. Edit the prose, not the plumbing.
+- The two event scripts are the `SCRIPTS` object at the top of `opening.js`.
+  They are said verbatim when the room asks for them out loud — "introduce
+  yourself", "welcome Dr Chris Oyakhilome" — and never unbidden. `opening.js`
+  loads before `memory.js`: its filter has to see the widget's greeting first.
 - A session is ten minutes (`data-minutes` on the `voice-session.js` tag);
   there is no cap on how many. It is drawn as a thinning arc around the orb
   and never announced.
