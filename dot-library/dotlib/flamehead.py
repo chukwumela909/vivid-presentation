@@ -119,17 +119,29 @@ def head_shell(oval: np.ndarray, m: int, rng: np.random.Generator) -> np.ndarray
     pts[:, 1] = -(verts[:, 1] - t_face_cy) * s + cy - 0.02 * fh
     pts[:, 2] = (verts[:, 2] - float(front[:, 2].mean())) * s + 0.20 * fw
 
-    sampled = _sample_surface(pts, faces, int(m * 1.7) + 64, rng)
-
     # Cull the front face cap (the scanned patch replaces it), anything below
     # the chin (no neck), and the entire back of the head — the sculpture is
     # the FACE with a shallow front shell (crown, temples, cheeks), not a skull.
-    in_oval = (((sampled[:, 0] - cx) / (0.56 * fw)) ** 2
-               + ((sampled[:, 1] - cy) / (0.58 * fh)) ** 2) < 1.0
-    cap = in_oval & (sampled[:, 2] > -0.06 * fw)
-    below_chin = sampled[:, 1] > y1 + 0.06 * fh
-    behind = sampled[:, 2] < -0.16 * fw
-    keep = sampled[~(cap | below_chin | behind)]
+    # Those culls discard most of the head, so oversample ADAPTIVELY: a fixed
+    # small factor would leave the shell mostly jittered duplicates.
+    def cull(s: np.ndarray) -> np.ndarray:
+        in_oval = (((s[:, 0] - cx) / (0.56 * fw)) ** 2
+                   + ((s[:, 1] - cy) / (0.58 * fh)) ** 2) < 1.0
+        cap = in_oval & (s[:, 2] > -0.06 * fw)
+        below_chin = s[:, 1] > y1 + 0.06 * fh
+        behind = s[:, 2] < -0.16 * fw
+        return s[~(cap | below_chin | behind)]
+
+    keep = np.empty((0, 3))
+    budget = int(m * 4) + 256
+    for _ in range(6):
+        keep = np.vstack([keep, cull(_sample_surface(pts, faces, budget, rng))])
+        if len(keep) >= m:
+            break
+        budget = min(budget * 2, 400_000)
+
+    if len(keep) == 0:          # degenerate framing — let the caller fall back
+        return None
     if len(keep) < m:
         extra = keep[rng.choice(len(keep), size=m - len(keep), replace=True)]
         keep = np.vstack([keep, extra + rng.normal(0, 1.5, extra.shape)])

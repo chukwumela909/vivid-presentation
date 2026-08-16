@@ -102,12 +102,29 @@ def build_layers(rgb: np.ndarray, mesh: dict, mask: np.ndarray, depth: np.ndarra
                      "poly": e[:, :2].astype(np.int32)}
 
     # ---------------- layer budgets
+    # The floors keep features legible at normal dot counts, but they must
+    # scale down for a tiny field or they would consume the whole budget and
+    # leave the skin negative.
     n_teethU = max(int(n * FRAC["teethU"]), 20)
     n_teethL = max(int(n * FRAC["teethL"]), 16)
     n_tongue = max(int(n * FRAC["tongue"]), 12)
     n_cavity = max(int(n * FRAC["cavity"]), 10)
     n_eye = max(int(n * FRAC["eye"]), 24)
-    n_skin = n - (n_teethU + n_teethL + n_tongue + n_cavity + 2 * n_eye)
+
+    def _layer_total():
+        return n_teethU + n_teethL + n_tongue + n_cavity + 2 * n_eye
+
+    cap = int(n * 0.45)                      # skin always keeps the majority
+    if _layer_total() > cap:
+        k = cap / max(_layer_total(), 1)
+        n_teethU = max(int(n_teethU * k), 1)
+        n_teethL = max(int(n_teethL * k), 1)
+        n_tongue = max(int(n_tongue * k), 1)
+        n_cavity = max(int(n_cavity * k), 1)
+        n_eye = max(int(n_eye * k), 1)
+    while _layer_total() > n - 1 and n_eye > 1:   # last-resort trim
+        n_eye -= 1
+    n_skin = max(n - _layer_total(), 0)
 
     # ---------------- skin: suppress density where eyeballs/mouth interior live
     density = density.copy()
@@ -179,8 +196,10 @@ def build_layers(rgb: np.ndarray, mesh: dict, mask: np.ndarray, depth: np.ndarra
     eye_layers = {}
     for key in ("A", "B"):
         e = eyes[key]
-        n_pup = max(int(n_eye * 0.15), 4)
-        n_iris = max(int(n_eye * 0.35), 8)
+        # Sub-budgets must sum to EXACTLY n_eye (they are concatenated into the
+        # final point set, so any drift changes the returned dot count).
+        n_pup = min(max(int(n_eye * 0.15), 4), n_eye)
+        n_iris = min(max(int(n_eye * 0.35), 8), n_eye - n_pup)
         n_scl = n_eye - n_pup - n_iris
         pup = _ellipse_disk(rng, n_pup, e["irisX"], e["irisY"], e["irisR"] * 0.42, e["irisR"] * 0.42)
         a = rng.uniform(0, 2 * np.pi, n_iris)
@@ -353,7 +372,11 @@ def predicted_head_shell(oval: np.ndarray, m: int, rng: np.random.Generator) -> 
             pts.append(p)
 
     out = np.vstack(pts)
-    out = out[out[:, 2] > -0.16 * fw]   # face-only: no back of head
+    culled = out[out[:, 2] > -0.16 * fw]   # face-only: no back of head
+    if len(culled):
+        out = culled
+    if len(out) == 0:
+        return np.zeros((m, 3))
     if len(out) < m:   # never come up short — pad with jittered copies
         extra = out[rng.choice(len(out), size=m - len(out), replace=True)]
         out = np.vstack([out, extra + rng.normal(0, 1.5, extra.shape)])

@@ -253,7 +253,9 @@ class DotField:
         pos = seg.p0 + (seg.p1 - seg.p0) * e
         if seg.arcs is not None:
             # Curved flight: bow peaks mid-travel, zero at both endpoints.
-            pos = pos + seg.arcs * np.sin(np.pi * np.asarray(e))
+            # Clamp before the sine — overshoot easings (back/elastic) push e
+            # past 1, which would flip the bow to the wrong side of the chord.
+            pos = pos + seg.arcs * np.sin(np.pi * np.clip(np.asarray(e), 0.0, 1.0))
         col = seg.c0 + (seg.c1 - seg.c0) * e
         pl = float(np.asarray(ease(p)))
         alpha = seg.a0 + (seg.a1 - seg.a0) * pl

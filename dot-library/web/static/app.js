@@ -253,7 +253,9 @@ function evalTimeline(tSec) {
       let ay = from[i][1] + (to[i][1] - from[i][1]) * e;
       let az = (from[i][2] || 0) + ((to[i][2] || 0) - (from[i][2] || 0)) * e;
       if (arcs) {
-        const bow = Math.sin(Math.PI * e);   // curved flight, zero at endpoints
+        // Clamp before the sine — overshoot easings (back/elastic) push e past
+        // 1, which would flip the bow to the wrong side of the chord.
+        const bow = Math.sin(Math.PI * Math.min(1, Math.max(0, e)));
         ax += arcs[i][0] * bow;
         ay += arcs[i][1] * bow;
         az += arcs[i][2] * bow;
@@ -542,6 +544,10 @@ function render() {
       cr = BG[0] + (FG[0] - BG[0]) * hv;
       cg = BG[1] + (FG[1] - BG[1]) * hv;
       cb = BG[2] + (FG[2] - BG[2]) * hv;
+    } else if (corr) {   // decay the colour jump from adopting a new timeline
+      cr += corr.r[i] * corrK;
+      cg += corr.g[i] * corrK;
+      cb += corr.b[i] * corrK;
     }
     const r = Math.max(0, Math.min(255, BG[0] + (cr - BG[0]) * ka));
     const g = Math.max(0, Math.min(255, BG[1] + (cg - BG[1]) * ka));
@@ -590,17 +596,26 @@ function adoptTimeline(tl, regions, tags) {
   const cosT = Math.cos(state.theta), sinT = Math.sin(state.theta);
   const cosP = Math.cos(state.phi || 0), sinP = Math.sin(state.phi || 0);
   const dx = new Float64Array(N), dy = new Float64Array(N), dz = new Float64Array(N);
+  const dr = new Float64Array(N), dg = new Float64Array(N), db = new Float64Array(N);
   for (let i = 0; i < N; i++) {
     const [wxi, wyi, wzi] = worldOf(i, cosT, sinT, cosP, sinP, cx, cy);
     dx[i] = wxi - seg0.from[i][0];
     dy[i] = wyi - seg0.from[i][1];
     dz[i] = wzi - (seg0.from[i][2] || 0);
+    // Colour correction too: the server builds a fresh field whose colours
+    // start at flat fg, so without this every adopted timeline flashes
+    // near-white at t=0 before interpolating to the target.
+    dr[i] = state.colors.r[i] - seg0.colorsFrom[i][0];
+    dg[i] = state.colors.g[i] - seg0.colorsFrom[i][1];
+    db[i] = state.colors.b[i] - seg0.colorsFrom[i][2];
   }
-  // The new timeline starts unrotated; fold the user's rotation back to zero
-  // so the incoming morph isn't double-rotated.
+  // The new timeline starts unrotated; fold the user's rotation (and the
+  // eased head-turn bias, which is baked into the positions we just sent)
+  // back to zero so the incoming morph isn't double-rotated.
   state.userYaw = 0;
   state.userPitch = 0;
-  state.corr = { x: dx, y: dy, z: dz, start: performance.now() / 1000 };
+  state.yawBias = 0;
+  state.corr = { x: dx, y: dy, z: dz, r: dr, g: dg, b: db, start: performance.now() / 1000 };
   state.timeline = tl;
   state.tlStart = performance.now() / 1000;
   state.regions = regions || null;

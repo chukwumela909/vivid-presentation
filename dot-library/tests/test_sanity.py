@@ -360,6 +360,48 @@ def test_frontalize_mixed_angles():
     print(f"ok: mixed-angle frontalization — compound {total(base):.0f}° residual -> {total(after):.1f}°")
 
 
+def test_small_field_face_does_not_crash():
+    """Regression: n below (and just above) the 200-dot face floor used to make
+    the shell budget negative/zero and crash the head-shell samplers."""
+    sample = os.path.join(os.path.dirname(__file__), "..", "web", "sample.jpg")
+    if not os.path.exists(sample):
+        print("skip: web/sample.jpg missing")
+        return
+    try:
+        import cv2  # noqa: F401
+    except ImportError:
+        print("skip: opencv missing")
+        return
+    for n in (40, 150, 201, 260):
+        f = dl.DotField(n=n, size=(400, 400), seed=3)
+        f.morph_to(dl.face(sample, structure=True, relax=2), duration=1.0)
+        pts = f.segments[-1].p1
+        assert pts.shape == (n, 3), f"n={n} produced {pts.shape}"
+        assert np.isfinite(pts).all(), f"n={n} produced non-finite points"
+    print("ok: face builds at tiny dot counts (40/150/201/260) without crashing")
+
+
+def test_arc_never_inverts_under_overshoot_easing():
+    """Regression: back/elastic overshoot past e=1, which flipped the flight
+    bow to the wrong side of the chord."""
+    from dotlib.easing import get_easing
+
+    for easing in ("back", "elastic"):
+        f = dl.DotField(n=120, size=(400, 400), seed=11, drift=0.0)
+        f.morph_to(dl.circle(), duration=1.0, stagger=0.0, arc=0.30, easing=easing)
+        seg = f.segments[-1]
+        ease = get_easing(easing)
+        norm2 = (seg.arcs ** 2).sum(axis=1) + 1e-12
+        worst = 0.0
+        for t in np.linspace(0.02, 0.98, 25):
+            e = float(np.asarray(ease(np.clip((t - seg.t0) / seg.duration, 0.0, 1.0))))
+            chord = seg.p0 + (seg.p1 - seg.p0) * e
+            proj = ((f.positions(t) - chord) * seg.arcs).sum(axis=1) / norm2
+            worst = min(worst, float(proj.min()))
+        assert worst >= -1e-6, f"{easing}: bow inverted (worst projection {worst:.4f})"
+    print("ok: curved flight never inverts, even under back/elastic overshoot")
+
+
 def test_segment_head_forced_box():
     try:
         import cv2  # noqa: F401
@@ -412,6 +454,8 @@ if __name__ == "__main__":
     test_frontalize_removes_captured_pose()
     test_frontalize_mixed_angles()
     test_curved_flight_arcs()
+    test_arc_never_inverts_under_overshoot_easing()
+    test_small_field_face_does_not_crash()
     test_segment_head_forced_box()
     test_face_module_loads()
     print("\nall sanity checks passed")

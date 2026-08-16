@@ -144,8 +144,8 @@ class ImageSpec(TargetSpec):
 
         # Budget: the scanned face patch dominates; the shallow front shell
         # (crown, temples, cheeks — no back of head) frames it.
-        n_face = max(int(field.n * 0.70), 200)
-        n_shell = field.n - n_face
+        n_face = min(max(int(field.n * 0.70), 200), field.n)
+        n_shell = max(field.n - n_face, 0)
 
         pts, colors, tags, regions = facelayers.build_layers(
             rgb, mesh, mask, depth_img, density, n_face, field.rng,
@@ -188,16 +188,18 @@ class ImageSpec(TargetSpec):
         # lofted from THIS person's jawline/hairline contour.
         from . import flamehead
 
-        shell = flamehead.head_shell(oval_c, n_shell, field.rng)
-        if shell is None:
-            shell = facelayers.predicted_head_shell(oval_c, n_shell, field.rng)
-        shell_v = 0.46 + field.rng.uniform(-0.06, 0.14, (n_shell, 1))
-        shell_colors = field.bg[None, :] + (field.fg - field.bg)[None, :] * shell_v
-        shell_tags = np.zeros(n_shell, dtype=np.int64)
-
-        all_pts = np.vstack([canvas_pts, shell])
-        all_colors = np.vstack([colors, shell_colors])
-        all_tags = np.concatenate([tags, shell_tags])
+        if n_shell > 0:
+            shell = flamehead.head_shell(oval_c, n_shell, field.rng)
+            if shell is None:
+                shell = facelayers.predicted_head_shell(oval_c, n_shell, field.rng)
+            shell_v = 0.46 + field.rng.uniform(-0.06, 0.14, (n_shell, 1))
+            shell_colors = field.bg[None, :] + (field.fg - field.bg)[None, :] * shell_v
+            shell_tags = np.zeros(n_shell, dtype=np.int64)
+            all_pts = np.vstack([canvas_pts, shell])
+            all_colors = np.vstack([colors, shell_colors])
+            all_tags = np.concatenate([tags, shell_tags])
+        else:  # tiny field: the face patch is the whole budget
+            all_pts, all_colors, all_tags = canvas_pts, colors, tags
 
         fx, fy, fbw, fbh = main_face.box
         meta = {
