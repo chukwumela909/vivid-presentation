@@ -394,6 +394,7 @@
   var swirlAmp = 0;                   /* connecting: the field spirals; eased in and out */
   var rgbT0 = -10;                    /* the moment a session connected, for the shimmer */
   var rgbLen = 2.6;                   /* how long the shimmer lasts */
+  var lean = { tx: 0, ty: 0, x: 0, y: 0 };   /* the field leans toward the pointer */
   var spin = 0, spin0 = 0;
   var holdUntil = 0;                  /* when the current formation should go */
   var raf = 0;
@@ -605,6 +606,9 @@
     /* the voice moves it: fast to rise so a consonant lands, slow to fall so
        it does not flicker between syllables. The agent's voice counts for
        more — when it speaks, the sphere visibly expands. */
+    lean.x += (lean.tx - lean.x) * 0.045;
+    lean.y += (lean.ty - lean.y) * 0.045;
+
     var mic = Vivid ? Vivid.levels.mic : 0;
     var agent = Vivid ? Vivid.levels.agent : 0;
     var target = Math.max(mic * 0.8, agent * 1.3);
@@ -661,8 +665,8 @@
       }
 
       x *= breath; y *= breath; z *= breath;
-      sx[i] = cx + x * cosT + z * sinT;
-      sy[i] = cy + y;
+      sx[i] = cx + x * cosT + z * sinT + lean.x;
+      sy[i] = cy + y + lean.y;
       sz[i] = -x * sinT + z * cosT;
     }
 
@@ -808,7 +812,7 @@
   function show(spec, opts) {
     opts = opts || {};
     var map = null;
-    if (spec.kind === 'word') map = targetText(String(spec.text || '').slice(0, 24));
+    if (spec.kind === 'word') map = targetText(String(spec.text || '').trim().slice(0, 40));
     else if (spec.kind === 'shape') map = targetShape(spec.shape);
     else if (spec.kind === 'image') map = targetImage(spec.image);
 
@@ -958,6 +962,60 @@
   resize();
   Dots.rest();                        /* the dots gather into the sphere on load */
 
+  /* ============================================================
+     input and voice — the button, the line of type, the announcements.
+     All of this used to live in orb.js; the orb is gone and the dots
+     inherited it, unchanged in behaviour.
+     ============================================================ */
+  var button = document.getElementById('tap');
+  var hint = document.getElementById('hint');
+  var live = document.getElementById('live');
+
+  if (button) {
+    button.addEventListener('click', function () {
+      if (Vivid) Vivid.tap();
+    });
+  }
+
+  /* the field leans a little towards the pointer — enough to feel watched,
+     not enough to notice it moving */
+  window.addEventListener('pointermove', function (ev) {
+    if (ev.pointerType === 'touch') return;
+    lean.tx = ((ev.clientX - w / 2) / w) * 22;
+    lean.ty = ((ev.clientY - h / 2) / h) * 16;
+    start();
+  });
+
+  var HINT = {
+    idle: 'tap to talk',
+    error: 'allow the microphone, then tap again'
+  };
+
+  var SAID = {
+    connecting: 'Connecting',
+    listening: 'Listening',
+    thinking: 'Thinking',
+    speaking: 'Vivid is speaking',
+    idle: 'Session ended. Tap to talk again.',
+    error: 'Could not start. Allow microphone access and tap again.'
+  };
+
+  if (Vivid) {
+    Vivid.on('phase', function (change) {
+      if (hint) hint.textContent = HINT[change.phase] || HINT.idle;
+      if (live && SAID[change.phase]) live.textContent = SAID[change.phase];
+
+      /* the hint is the button's only visible label and it fades out once a
+         call starts, so the accessible name has to carry it from there */
+      if (button) {
+        button.setAttribute('aria-label',
+          change.state === 'live' || change.state === 'connecting'
+            ? 'End the conversation'
+            : 'Talk to Vivid');
+      }
+    });
+  }
+
   /* under ?debug, the transient states can be forced, for eyes and for tests */
   if (DEBUG) {
     Dots._debug = {
@@ -1006,7 +1064,10 @@
         },
         text: {
           type: 'string',
-          description: 'word only: one or two words, up to 24 characters. Short reads best.'
+          description:
+            'word only: ANY text you choose — whatever the moment calls for. A name, a number, a place, ' +
+            'the word you just landed on. Nothing is preset and nothing is off limits: you decide it as ' +
+            'you speak. Up to 40 characters, though one or two words reads best on screen.'
         },
         shape: {
           type: 'string',
