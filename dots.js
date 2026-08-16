@@ -188,6 +188,31 @@
       }
       c.closePath(); c.fill();
     },
+    hand: function (c, W, H, r) {
+      /* an open palm mid-wave, leaning the way a wave leans */
+      c.save();
+      c.translate(W / 2, H / 2);
+      c.rotate(-0.22);
+      var s = r / 96;
+      c.lineCap = 'round';
+      c.lineWidth = 22 * s;
+      c.beginPath();
+      if (c.ellipse) c.ellipse(0, 44 * s, 42 * s, 46 * s, 0, 0, 6.2832);
+      else c.arc(0, 44 * s, 44 * s, 0, 6.2832);
+      c.fill();
+      var fx = [-39, -13, 13, 39], fh = [82, 104, 110, 90];
+      for (var k = 0; k < 4; k++) {
+        c.beginPath();
+        c.moveTo(fx[k] * s, 14 * s);
+        c.lineTo(fx[k] * 1.1 * s, (14 - fh[k]) * s);
+        c.stroke();
+      }
+      c.beginPath();
+      c.moveTo(-38 * s, 52 * s);
+      c.lineTo(-84 * s, 12 * s);
+      c.stroke();
+      c.restore();
+    },
     star: function (c, W, H, r) { poly(c, W, H, r, 5, 0.45); },
     triangle: function (c, W, H, r) { poly(c, W, H, r, 3, 0); },
     hexagon: function (c, W, H, r) { poly(c, W, H, r, 6, 0); },
@@ -1096,7 +1121,15 @@
         g.drawImage(canvas, 0, 0, c2.width, c2.height);
         return c2.toDataURL('image/png');
       },
-      phase: function (p) { phase = p; }
+      phase: function (p) { phase = p; },
+      tick: function () { ambientLoop(); },
+      warp: function (s) { amb.last -= s; amb.quiet -= s; talk.cool -= s; },
+      probe: function () {
+        return { phase: phase, vphase: Vivid && Vivid.phase, showing: !!Dots.showing,
+                 job: !!job, seg: !!seg, resting: resting, auto: auto.on,
+                 wantTime: !!wantTime, ambLast: amb.last, ambQuiet: amb.quiet,
+                 now: performance.now() / 1000 };
+      }
     };
   }
 
@@ -1109,24 +1142,57 @@
      ------------------------------------------------------------ */
   var AMBIENT = [
     { kind: 'neu' },
-    { kind: 'shape', shape: 'circle' },
     { kind: 'word', text: 'vivid' },
+    { kind: 'word', text: 'Hello' },
+    { kind: 'shape', shape: 'hand' },
+    { kind: 'word', text: 'Holla' },
     { kind: 'shape', shape: 'heart' },
-    { kind: 'neu' },
-    { kind: 'shape', shape: 'spiral' },
-    { kind: 'shape', shape: 'star' }
+    { kind: 'word', text: 'tap to talk', invite: true },
+    { kind: 'shape', shape: 'star' },
+    { kind: 'shape', shape: 'circle' },
+    { kind: 'shape', shape: 'spiral' }
   ];
-  var amb = { i: 0, last: 0 };
+  var amb = { i: 0, last: 0, quiet: 0, spec: null };
 
-  setInterval(function ambientLoop() {
+  function ambientLoop() {
     var now = performance.now() / 1000;
-    if (!Vivid || Vivid.phase !== 'idle' || auto.on) { amb.last = now + 3; return; }
+    if (!Vivid || auto.on) { amb.last = now + 3; return; }
+
+    var mic = Vivid.levels ? Vivid.levels.mic : 0;
+    var agent = Vivid.levels ? Vivid.levels.agent : 0;
+    var talking = mic >= 0.09 || agent >= 0.09 ||
+                  Vivid.phase === 'speaking' || Vivid.phase === 'thinking';
+    if (talking) amb.quiet = now;
+
+    /* a voice returning mid-pose takes the room back at once — the pose
+       was only ever filling a silence */
+    if (amb.spec) {
+      if (Dots.showing !== amb.spec) amb.spec = null;
+      else if (talking && phase === 'live') {
+        amb.spec = null;
+        Dots.rest({ duration: 0.8 });
+        return;
+      }
+    }
+
+    if (phase === 'connecting') { amb.last = now; return; }
+    var idle = phase !== 'live';
     if (Dots.showing || job || seg || !resting) return;
-    if (!amb.last) amb.last = now;
-    if (now - amb.last < 9) return;
+    if (wantTime) return;                 /* the countdown asked first */
+    if (!amb.last) { amb.last = now; return; }
+
+    /* idle: every little while. live: only into a real lull — nobody has
+       said anything for a stretch — held shorter, and never the
+       invitation to tap; they already have. */
+    if (now - amb.last < (idle ? 9 : 14)) return;
+    if (!idle && now - amb.quiet < 12) return;
+    var spec = AMBIENT[amb.i++ % AMBIENT.length];
+    if (!idle && spec.invite) spec = AMBIENT[amb.i++ % AMBIENT.length];
     amb.last = now;
-    show(AMBIENT[amb.i++ % AMBIENT.length], { hold: 4.5 });
-  }, 1000);
+    amb.spec = spec;
+    show(spec, { hold: idle ? 4.5 : 3.2 });
+  }
+  setInterval(ambientLoop, 1000);
 
   /* ------------------------------------------------------------
      the countdown, occasionally
@@ -1213,7 +1279,7 @@
         },
         shape: {
           type: 'string',
-          enum: ['circle', 'ring', 'heart', 'star', 'spiral', 'hexagon', 'triangle'],
+          enum: ['circle', 'ring', 'heart', 'star', 'spiral', 'hexagon', 'triangle', 'hand'],
           description: 'shape only: which shape to form.'
         }
       },
@@ -1308,5 +1374,53 @@
     auto.on = false;
     if (Dots.showing) Dots.rest();
     results = {};
+  });
+
+  /* ============================================================
+     9 · listening along
+     As she speaks, the room follows the words. Her name becomes
+     vivid, a greeting becomes Hello, the event becomes NEU 26 with
+     the 26 aglow, love becomes the heart, a goodbye becomes the
+     waving hand. The transcript stream drives it — hers, and the
+     user's where the platform transcribes it — and a cooldown keeps
+     it an accent on the conversation, not a slideshow over it.
+     ============================================================ */
+  var CUES = [
+    { re: /\bneu\s*26\b|\bneu\b|\bevents?\b/, spec: { kind: 'neu' } },
+    { re: /\bvivid\b|\bmy name\b|\bwho i am\b/, spec: { kind: 'word', text: 'vivid' } },
+    { re: /\bhello\b|\bhi\b|\bhey\b/, spec: { kind: 'word', text: 'Hello' } },
+    { re: /\bholla\b|\bhola\b/, spec: { kind: 'word', text: 'Holla' } },
+    { re: /\blove\b|\bheart\b/, spec: { kind: 'shape', shape: 'heart' } },
+    { re: /\bwaving?\b|\bwelcome\b|\bgoodbye\b|\bbye\b/, spec: { kind: 'shape', shape: 'hand' } },
+    { re: /\bstars?\b/, spec: { kind: 'shape', shape: 'star' } },
+    { re: /\bcircle\b/, spec: { kind: 'shape', shape: 'circle' } },
+    { re: /\bspiral\b/, spec: { kind: 'shape', shape: 'spiral' } }
+  ];
+  var talk = { buf: '', cool: -9 };
+
+  function heard(text) {
+    talk.buf = (talk.buf + ' ' + String(text || '').toLowerCase()).slice(-160);
+    var now = performance.now() / 1000;
+    if (now - talk.cool < 8) return;
+    if (Dots.showing || job || seg || !resting) return;
+    for (var k = 0; k < CUES.length; k++) {
+      if (CUES[k].re.test(talk.buf)) {
+        talk.buf = '';
+        talk.cool = now;
+        amb.last = now;                 /* the lull clock starts over */
+        show(CUES[k].spec, { hold: 3, duration: 1.3 });
+        return;
+      }
+    }
+  }
+  if (DEBUG && Dots._debug) Dots._debug.say = heard;
+
+  Vivid.on('event', function (ev) {
+    if (!ev || !ev.type) return;
+    if (ev.type === 'response.created') { talk.buf = ''; return; }
+    if (ev.type.indexOf('transcript') === -1) return;
+    var t = typeof ev.delta === 'string' ? ev.delta
+          : typeof ev.transcript === 'string' ? ev.transcript : '';
+    if (t) heard(t);
   });
 })();
