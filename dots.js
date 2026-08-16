@@ -391,9 +391,9 @@
   var resting = true;                 /* showing the sphere, not a formation */
   var level = 0;                      /* voice, eased — fast to rise, slow to fall */
   var phase = 'idle';                 /* mirrors Vivid: idle · connecting · live ... */
-  var swirlAmp = 0;                   /* connecting: the field spirals; eased in and out */
-  var rgbT0 = -10;                    /* the moment a session connected, for the shimmer */
-  var rgbLen = 2.6;                   /* how long the shimmer lasts */
+  var swirlAmp = 0;                   /* connecting: the ball turns faster; eased in and out */
+  var colorK = 0;                     /* connecting: colour rises, then drains back to white */
+  var colorHold = 0;                  /* ?debug only: pins the colour on */
   var lean = { tx: 0, ty: 0, x: 0, y: 0 };   /* the field leans toward the pointer */
   var coreN = 0;                      /* how many dots are the sphere; the rest are dust */
   var spinAngle = 0;                  /* the sphere's continuous rotation */
@@ -411,10 +411,8 @@
     arcX = new Float32Array(n); arcY = new Float32Array(n); arcZ = new Float32Array(n);
     w1 = new Float32Array(n * 3); w2 = new Float32Array(n * 3);
     ph1 = new Float32Array(n * 3); ph2 = new Float32Array(n * 3);
-    tint = new Uint8Array(n);
 
     var rand = rng(9);
-    for (var q = 0; q < n; q++) tint[q] = (rand() * TINTS.length) | 0;
     for (var i = 0; i < n * 3; i++) {
       w1[i] = (0.25 + rand() * 0.35) * 6.2832 * 0.5;
       w2[i] = (0.70 + rand() * 0.60) * 6.2832 * 0.5;
@@ -581,29 +579,7 @@
     s.fillRect(0, 0, S, S);
   })();
 
-  /* every dot's own everyday colour: a soft tint, assigned once and kept —
-     the field reads as colour without ever shouting */
-  var TINTS = (function () {
-    var out = [];
-    for (var hdeg = 0; hdeg < 360; hdeg += 24) {
-      var c = document.createElement('canvas');
-      var S = 32;
-      c.width = c.height = S;
-      var s = c.getContext('2d');
-      var g = s.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-      g.addColorStop(0, 'hsla(' + hdeg + ',62%,82%,1)');
-      g.addColorStop(0.62, 'hsla(' + hdeg + ',58%,74%,1)');
-      g.addColorStop(1, 'hsla(' + hdeg + ',58%,74%,0)');
-      s.fillStyle = g;
-      s.fillRect(0, 0, S, S);
-      out.push(c);
-    }
-    return out;
-  })();
-
-  var tint = null;                    /* per-dot index into TINTS */
-
-  /* ...and a ring of coloured ones, for the moment a session connects */
+  /* ...and a ring of coloured ones, for the connecting moment only */
   var HUES = (function () {
     var out = [];
     for (var hdeg = 0; hdeg < 360; hdeg += 30) {
@@ -657,7 +633,10 @@
        the same direction, on an axis that leans and slowly shifts. At rest
        it is barely turning; while connecting it spins up, and it eases back
        down once the line is open. Only the sphere; the dust holds still. */
-    swirlAmp += ((phase === 'connecting' ? 1 : 0) - swirlAmp) * 0.05;
+    /* quick to spin up, slow to wind down — connecting accelerates the turn,
+       and once the line is open it coasts back to its resting drift */
+    var connecting = phase === 'connecting' ? 1 : 0;
+    swirlAmp += (connecting - swirlAmp) * (connecting > swirlAmp ? 0.07 : 0.012);
     var dtF = Math.min(0.05, Math.max(0, t - lastT));
     lastT = t;
     spinAngle += dtF * (0.22 + 2.3 * swirlAmp);
@@ -667,9 +646,12 @@
 
     /* the moment it connects: a wave of colour travels around the ball with
        that same motion, then it settles back to its own white */
-    var rgbK = 0;
-    var dtRGB = t - rgbT0;
-    if (dtRGB >= 0 && dtRGB < rgbLen) rgbK = Math.sin(Math.min(1, dtRGB / rgbLen) * Math.PI);
+    /* colour belongs to the connecting moment and nothing else: it rises as
+       the ball spins up, and drains back to white once the line is open —
+       slower than it came, so the settle is felt rather than seen */
+    var wantColor = Math.max(connecting, colorHold);
+    colorK += (wantColor - colorK) * (wantColor > colorK ? 0.05 : 0.014);
+    var rgbK = colorK;
 
     /* drift keeps the field alive while it holds a pose */
     var i;
@@ -719,7 +701,7 @@
       var av = alpha * pb[i] * shade * lift;
       if (av <= 0.004) continue;
       var r = DOT_R * persp;
-      var base = TINTS[tint[i]];
+      var base = sprite;              /* white is the everyday colour */
       if (rgbK > 0.01 && !(resting && i >= coreN)) {
         /* the connect shimmer: full colour crossfades in over the dot's own
            tint and back out. The hue is not striped by index — it is a wave
@@ -1044,7 +1026,7 @@
   /* under ?debug, the transient states can be forced, for eyes and for tests */
   if (DEBUG) {
     Dots._debug = {
-      shimmer: function (secs) { rgbLen = secs || 2.6; rgbT0 = performance.now() / 1000 + debugTimeOff; },
+      shimmer: function (on) { colorHold = on === false ? 0 : 1; },
       countdown: function () { wantTime = true; nextMark = timeMarks.length; },
       /* advance the animation by hand — for a hidden pane or a test rig,
          where requestAnimationFrame never fires */
@@ -1109,9 +1091,7 @@
      the moment of connection shimmers, speaking swells (via levels above) */
   if (Vivid) {
     Vivid.on('phase', function (change) {
-      var wasConnecting = phase === 'connecting';
       phase = change.state === 'connecting' ? 'connecting' : change.state;
-      if (wasConnecting && change.state === 'live') rgbT0 = performance.now() / 1000;
       start();
     });
   }
