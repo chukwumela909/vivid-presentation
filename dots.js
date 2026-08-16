@@ -397,6 +397,53 @@
     c.restore();
   }
 
+  /* The globe is not a picture of the earth, it is the earth: dots spread
+     evenly over a real sphere, each one taking its colour from where it
+     falls on the emoji's disc. Which means it can be turned — and a
+     sphere of dots turning is the only honest way to show a world. */
+  function globeInto(b, n, map) {
+    var R = 0.3 * Math.min(w, h);
+    var GOLD = Math.PI * (1 + Math.sqrt(5));
+    var rand = rng(41);
+    var mw = map.w, mh = map.h;
+    var half = Math.min(mw, mh) * 0.5;
+
+    for (var i = 0; i < n; i++) {
+      var k = i + 0.5;
+      var phi = Math.acos(1 - 2 * k / n);
+      var theta = GOLD * k;
+      var sinp = Math.sin(phi);
+      var ux = sinp * Math.cos(theta);
+      var uy = Math.cos(phi);
+      var uz = sinp * Math.sin(theta);
+
+      b.x[i] = w / 2 + R * ux;
+      b.y[i] = h / 2 + R * uy;
+      b.z[i] = R * uz;
+
+      /* read the disc as the face of a sphere: a dot on the far side
+         wears the near side's colours, which no one can tell apart on
+         something that is turning */
+      var sx2 = mw / 2 + ux * half * 0.94;
+      var sy2 = mh / 2 + uy * half * 0.94;
+      var cell = (Math.min(mh - 1, Math.max(0, sy2 | 0))) * mw +
+                 (Math.min(mw - 1, Math.max(0, sx2 | 0)));
+      var v = map.d[cell];
+      b.c[i] = map.mk ? map.mk[cell] : 0;
+      b.u[i] = map.hue ? map.hue[cell] : 0;
+      if (b.c[i] < 0.1) {                     /* ocean between the marks */
+        b.c[i] = 0.8;
+        b.u[i] = 0.56 + rand() * 0.04;
+      }
+      /* land is darker than ocean in the artwork, so weighting by tone
+         alone sinks every continent — lift the floor and let the hue do
+         the telling instead */
+      var land = b.u[i] > 0.12 && b.u[i] < 0.46;
+      b.b[i] = (land ? 0.88 : 0.6) + 0.3 * Math.min(1, v * 1.6);
+    }
+    return b;
+  }
+
   function targetEmoji(ch) {
     ch = String(ch || '').trim().slice(0, 8);
     if (!ch) return null;
@@ -609,6 +656,8 @@
   var colorHold = 0;                  /* ?debug only: pins the colour on */
   var lean = { tx: 0, ty: 0, x: 0, y: 0 };   /* the field leans toward the pointer */
   var coreN = 0;                      /* how many dots are the sphere; the rest are dust */
+  var spinning = false;               /* a formation that turns: the globe */
+  var rocking = false, rockAt = null; /* a formation that waves: the hand */
   var lastT = 0;
   var spin = 0, spin0 = 0;
   var holdUntil = 0;                  /* when the current formation should go */
@@ -697,6 +746,7 @@
     var dur = opts.duration != null ? opts.duration : 1.7;
     var stagger = opts.stagger != null ? opts.stagger : 0.34;
     var arc = opts.arc != null ? opts.arc : 0.2;
+    var swirl = !!opts.swirl;
     var rand = rng(opts.seed || 17);
     /* the same clock the frames run on — under ?debug the frames step a
        synthetic time forward, and a flight stamped in wall time would be
@@ -715,12 +765,24 @@
          once it has any colour at all, and the fade in and out is carried
          by how much colour it carries */
       if (opts.hue && tc[i] > 0.01) pu[i] = opts.hue[i];
-      delay[i] = stagger > 0 ? rand() * stagger : 0;
+      /* A gather is a drain, not a shrink. With every dot bowing a random
+         way there is no shared motion, so what you see is the formation's
+         own footprint contracting — and a word's footprint is a wide
+         rectangle, which is exactly the "coming out of a square" of it.
+         Bow them all the same way round and stagger them by where they
+         stand, and the field spirals into the orb instead. */
+      if (swirl) {
+        var ang = Math.atan2(fy[i] - h / 2, fx[i] - w / 2);
+        var sweep = ((ang + Math.PI) / 6.2832 + 1) % 1;
+        delay[i] = stagger > 0 ? (sweep * 0.7 + rand() * 0.3) * stagger : 0;
+      } else {
+        delay[i] = stagger > 0 ? rand() * stagger : 0;
+      }
 
       if (arc > 0) {
         var dx = tx[i] - fx[i], dy = ty[i] - fy[i];
         var dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        var amp = (rand() * 2 - 1) * arc * dist;
+        var amp = (swirl ? 0.7 + rand() * 0.5 : rand() * 2 - 1) * arc * dist;
         arcX[i] = (-dy / dist) * amp;
         arcY[i] = (dx / dist) * amp;
         arcZ[i] = (rand() * 2 - 1) * arc * 0.6 * dist;
@@ -885,8 +947,10 @@
        snap, and a formation in flight is never twisted by a rotation that
        kept running underneath it. While anything is forming, flying, or
        being shown, the ball simply does not turn. */
-    if (resting && !seg && !job) {
-      var dA = dtF * (0.22 + 2.3 * swirlAmp);
+    if ((resting || spinning) && !seg && !job) {
+      /* the globe keeps a steady turn of its own; the resting ball drifts
+         and spins up only while connecting */
+      var dA = dtF * (resting ? (0.22 + 2.3 * swirlAmp) : 0.30);
       var caD = Math.cos(dA), saD = Math.sin(dA);
       for (var ri = 0; ri < N; ri++) {
         var rx = px[ri] - cx, ry = py[ri] - cy, rz = pz[ri];
@@ -897,6 +961,25 @@
         px[ri] = cx + nx1;
         py[ri] = cy + (v1 * cosTl + v2 * sinTl);
         pz[ri] = -v1 * sinTl + v2 * cosTl;
+      }
+    }
+
+    /* a wave is a wave: the hand rocks about its wrist, and because the
+       rock is applied as a difference it can be interrupted at any angle
+       without a snap — a flight simply starts from wherever it had got to */
+    if (rocking && !seg && !job) {
+      var want = 0.17 * Math.sin(t * 2.4);
+      if (rockAt === null) rockAt = want;
+      var dR = want - rockAt;
+      rockAt = want;
+      if (dR) {
+        var wy = cy + 0.26 * Math.min(w, h);           /* the wrist */
+        var cR = Math.cos(dR), sR = Math.sin(dR);
+        for (var wi = 0; wi < N; wi++) {
+          var qx = px[wi] - cx, qy = py[wi] - wy;
+          px[wi] = cx + qx * cR - qy * sR;
+          py[wi] = wy + qx * sR + qy * cR;
+        }
       }
     }
 
@@ -1095,15 +1178,29 @@
     else if (spec.kind === 'neu') map = targetText('NEU 26', [{ t: 'NEU ', l: 0.52 }, { t: '26', l: 1, rgb: true }]);
     else if (spec.kind === 'shape') map = targetShape(spec.shape);
     else if (spec.kind === 'emoji') map = targetEmoji(spec.emoji);
+    else if (spec.kind === 'globe') map = targetEmoji('🌍');
     else if (spec.kind === 'image') map = targetImage(spec.image);
 
     if (!map) { note('nothing to show for', spec); return false; }
 
     lastSeed = (lastSeed * 7 + 13) & 0xffff;
-    job = {
-      st: stippleInit(map, N, lastSeed, reduceMotion ? 2 : 6),
-      opts: opts, seed: lastSeed, n: N
-    };
+    job = null;
+    spinning = spec.kind === 'globe';
+    rocking = spec.kind === 'shape' && spec.shape === 'hand';
+    rockAt = null;
+
+    if (spec.kind === 'globe') {
+      /* no stipple: the dots go straight onto a sphere and take their
+         colours from the disc, so there is nothing to relax */
+      ensureBuf();
+      flyTo(globeInto(buf, N, map), opts, lastSeed);
+    } else {
+      job = {
+        st: stippleInit(map, N, lastSeed, reduceMotion ? 2 : 6),
+        opts: opts, seed: lastSeed, n: N
+      };
+    }
+
     Dots.showing = spec;
     resting = false;
     start();
@@ -1119,6 +1216,14 @@
     if (!stippleStep(job.st)) return;
 
     var b = place(job.st, N, job.seed);
+    var opts = job.opts, seed = job.seed;
+    job = null;
+    flyTo(b, opts, seed);
+  }
+
+  /* pair the field to an arrangement and send it there — the one road
+     every formation takes, stipple or sphere */
+  function flyTo(b, opts, seed) {
     var perm = assign(px, py, b.x, b.y, N);
     var ax = new Float32Array(N), ay = new Float32Array(N),
         az = new Float32Array(N), ab = new Float32Array(N),
@@ -1128,8 +1233,6 @@
       ax[i] = b.x[j]; ay[i] = b.y[j]; az[i] = b.z[j]; ab[i] = b.b[j];
       ac[i] = b.c[j]; au[i] = b.u[j];
     }
-    var opts = job.opts, seed = job.seed;
-    job = null;
     begin(ax, ay, az, ab, {
       duration: opts.duration != null ? opts.duration : 1.7,
       hold: opts.hold,
@@ -1179,6 +1282,10 @@
       return show({ kind: 'emoji', emoji: ch }, opts);
     },
 
+    globe: function (opts) {
+      return show({ kind: 'globe' }, opts);
+    },
+
     image: function (img, opts) {
       return show({ kind: 'image', image: img }, opts);
     },
@@ -1209,6 +1316,9 @@
       opts = opts || {};
       auto.on = false;
       job = null;
+      spinning = false;
+      rocking = false;
+      rockAt = null;
       ensureBuf();
       sphereInto(buf.x, buf.y, buf.z, buf.b, N, rng(77));
       Dots.showing = null;
@@ -1225,8 +1335,9 @@
       }
       begin(ax, ay, az, ab, {
         duration: opts.duration != null ? opts.duration : 1.5,
-        stagger: 0.16,
-        arc: 0.12,
+        stagger: 0.34,
+        arc: 0.26,
+        swirl: true,
         hold: false,
         alpha: 1
       });
@@ -1383,15 +1494,18 @@
      26 glowing, a shape, a word — and gathers back. The moment a session
      starts it snaps back to being the orb and stays out of the way.
      ------------------------------------------------------------ */
+  /* the running order: the event, then who is saying it, then the two
+     marks — and after them the room can play */
   var AMBIENT = [
     { kind: 'neu' },
     { kind: 'word', text: 'vivid' },
-    { kind: 'word', text: 'Hello' },
-    { kind: 'shape', shape: 'hand' },
     { kind: 'shape', shape: 'loveworld' },
-    { kind: 'word', text: 'Holla' },
     { kind: 'shape', shape: 'worldstreet' },
+    { kind: 'globe' },
+    { kind: 'shape', shape: 'hand' },
+    { kind: 'word', text: 'Hello' },
     { kind: 'shape', shape: 'heart' },
+    { kind: 'word', text: 'Holla' },
     { kind: 'word', text: 'tap to talk', invite: true }
   ];
   var amb = { i: 0, last: 0, quiet: 0, spec: null };
@@ -1506,10 +1620,11 @@
       properties: {
         show: {
           type: 'string',
-          enum: ['word', 'shape', 'emoji', 'burst', 'auto', 'rest'],
+          enum: ['word', 'shape', 'emoji', 'globe', 'burst', 'auto', 'rest'],
           description:
             'word — the dots spell something (give text). shape — they form a shape (give shape). ' +
             'emoji — they become an emoji, in its own colours (give emoji). ' +
+            'globe — they become the earth, turning, for anything about the world. ' +
             'burst — they scatter across the whole screen. auto — they cycle on their own until told otherwise. ' +
             'rest — they gather back into the sphere, which is where they live when nothing is being shown.'
         },
@@ -1633,6 +1748,7 @@
       case 'word': return Dots.word(args.text);
       case 'shape': return Dots.shape(args.shape || 'circle');
       case 'emoji': return Dots.emoji(args.emoji);
+      case 'globe': return Dots.globe();
       case 'burst': return Dots.burst();
       case 'auto': return Dots.auto(true);
       case 'rest': case 'clear': return Dots.rest();
@@ -1678,6 +1794,8 @@
     { re: /\bholla\b|\bhola\b/, spec: { kind: 'word', text: 'Holla' } },
     { re: /\bworld\s*street\b|\bworldstreet\b/,
       spec: { kind: 'shape', shape: 'worldstreet' } },
+    { re: /\bglobe\b|\bthe\s+world\b|\bplanet\b|\bearth\b|\bworldwide\b|\baround\s+the\s+world\b/,
+      spec: { kind: 'globe' } },
     { re: /\blove\s*world\b|\bloveworld\b|\bchurch\b|\bministry\b/,
       spec: { kind: 'shape', shape: 'loveworld' } },
     { re: /\blove\b|\bheart\b/, spec: { kind: 'shape', shape: 'heart' } },
