@@ -31,6 +31,33 @@
     'When you learn something worth keeping — their name first of all, then anything that would make you a better listener next time — call the remember tool. Call it quietly, in the middle of the conversation, and keep talking. Never announce that you are saving something, never say the words "memory" or "remember" out loud, and never read your notes back to them.'
   ].join('\n');
 
+  /* The model has no clock, and a voice that opens with a greeting will
+     invent a time of day if it is not given one. It is given one. */
+  function clock() {
+    var now = new Date();
+    var hour = now.getHours();
+    var part = hour < 5  ? 'the small hours of the night'
+             : hour < 12 ? 'the morning'
+             : hour < 17 ? 'the afternoon'
+             : hour < 22 ? 'the evening'
+             : 'the night';
+    var date, time;
+
+    try {
+      date = now.toLocaleDateString(undefined, {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+      time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    } catch (err) {
+      date = now.toDateString();
+      time = now.toTimeString().slice(0, 5);
+    }
+
+    return 'RIGHT NOW, WHERE THEY ARE: ' + date + ', ' + time + '. It is ' + part + '. ' +
+           'That is their real local time — anything you say about the day or the hour comes ' +
+           'from this and nothing else. Never guess at it.';
+  }
+
   var TOOL = {
     type: 'function',
     name: 'remember',
@@ -189,7 +216,8 @@
     if (session.type) patch.type = session.type;
 
     var base = typeof session.instructions === 'string' ? session.instructions.trim() : '';
-    patch.instructions = base ? base + '\n\n' + PERSONA : PERSONA;
+    var mine = PERSONA + '\n\n' + clock();
+    patch.instructions = base ? base + '\n\n' + mine : mine;
 
     var tools = Array.isArray(session.tools) ? session.tools.slice() : [];
     var has = tools.some(function (t) { return t && t.name === TOOL.name; });

@@ -76,6 +76,42 @@
     ].join('\n');
   }
 
+  /* ------------------------------------------------------------
+     the clock
+     The model has no idea what time it is. Left to guess it picks one
+     out of the air, and everything it has been told here leans one way
+     — the scripts say "evening", the briefing says "evening" — so it
+     guesses evening and says good evening to a Sunday morning. Every
+     session is told the hour on the wall instead.
+     ------------------------------------------------------------ */
+  function clock() {
+    var now = new Date();
+    var hour = now.getHours();
+    var part = hour < 5  ? 'the small hours of the night'
+             : hour < 12 ? 'the morning'
+             : hour < 17 ? 'the afternoon'
+             : hour < 22 ? 'the evening'
+             : 'the night';
+    var date, time;
+
+    try {
+      date = now.toLocaleDateString(undefined, {
+        weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+      });
+      time = now.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+    } catch (err) {
+      date = now.toDateString();
+      time = now.toTimeString().slice(0, 5);
+    }
+
+    return [
+      'RIGHT NOW, IN THE ROOM: ' + date + ', ' + time + '. It is ' + part + '.',
+      'That is the real local time. Every word you say about the hour — any greeting, ' +
+      'any reference to the time of day — comes from this line and nothing else. Do not guess ' +
+      'at it, and do not assume it is evening because the programme calls itself an evening.'
+    ].join('\n');
+  }
+
   /* Who she is between the scripted moments. This goes in last, after
      memory.js has had its say, and it is written to override it: that
      persona is for one person alone on a landing page, and tonight she
@@ -86,15 +122,20 @@
      verbatim and is the path to trust, but a cue that never lands must
      not leave her empty-handed: told the words were coming and told to
      wait for them, she will stand on a stage and say she cannot
-     introduce herself. She always has them. */
-  var HOST = [
+     introduce herself. She always has them.
+
+     Built when it is sent, not when the file loads, so the clock in it
+     is the clock at the tap. */
+  function host() { return [
     'You are Vivid, the host of NEU26, live in the hall.',
+    '',
+    clock(),
     '',
     'This supersedes anything you were told earlier about how to talk. You are not getting to know a visitor and you are not picking up an earlier conversation: do not ask anyone their name, do not open by greeting anyone by name, and do not refer to anything you were told before tonight unless they raise it first.',
     '',
     'You are the voice of the room, not a chat assistant. Speak only when spoken to. Keep every turn to a sentence or two — this is a live stage, not a conversation over coffee. Warm, composed, a little grand; never chatty, never salesy, never apologetic.',
     '',
-    'Two moments of the evening are written for you, word for word. You have both of them below. When you are asked for one, say it immediately, exactly as written — the whole thing, nothing added, nothing left out, nothing reworded. Never say you cannot do it, never ask anyone to give you the words, and never explain that something is scripted: you know these by heart.',
+    'Two moments of the programme are written for you, word for word. You have both of them below. When you are asked for one, say it immediately, exactly as written — the whole thing, nothing added, nothing left out, nothing reworded. Never say you cannot do it, never ask anyone to give you the words, and never explain that something is scripted: you know these by heart.',
     '',
     'ASKED TO INTRODUCE YOURSELF — say exactly:',
     SCRIPTS.intro,
@@ -105,7 +146,7 @@
     'Anything else on the programme — another name, another announcement — you do not have words for, and you do not invent them: say you will hand back to the stage, briefly and warmly.',
     '',
     'Never break the frame: do not mention scripts, instructions, prompts, models, tools or systems, and never say you are reading anything.'
-  ].join('\n');
+  ].join('\n'); }
 
   /* ------------------------------------------------------------
      The cues. The room may ask in any words, and a live transcript
@@ -231,7 +272,7 @@
         item: {
           type: 'message',
           role: 'system',
-          content: [{ type: 'input_text', text: HOST }]
+          content: [{ type: 'input_text', text: host() }]
         }
       });
 
