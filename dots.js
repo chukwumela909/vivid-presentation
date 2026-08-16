@@ -414,7 +414,6 @@
   var colorHold = 0;                  /* ?debug only: pins the colour on */
   var lean = { tx: 0, ty: 0, x: 0, y: 0 };   /* the field leans toward the pointer */
   var coreN = 0;                      /* how many dots are the sphere; the rest are dust */
-  var spinAngle = 0;                  /* the sphere's continuous rotation */
   var lastT = 0;
   var spin = 0, spin0 = 0;
   var holdUntil = 0;                  /* when the current formation should go */
@@ -501,7 +500,10 @@
     var stagger = opts.stagger != null ? opts.stagger : 0.34;
     var arc = opts.arc != null ? opts.arc : 0.2;
     var rand = rng(opts.seed || 17);
-    var now = performance.now() / 1000;
+    /* the same clock the frames run on — under ?debug the frames step a
+       synthetic time forward, and a flight stamped in wall time would be
+       born already finished */
+    var now = performance.now() / 1000 + debugTimeOff;
 
     if (reduceMotion) { dur = Math.min(dur, 0.45); stagger = 0; arc = 0; }
 
@@ -539,9 +541,19 @@
      ------------------------------------------------------------ */
   var debugTimeOff = 0;   /* ?debug only: lets tests step time without rAF */
 
+  var dimCheck = 0;
   function frame() {
     raf = requestAnimationFrame(frame);
     var t = performance.now() / 1000 + debugTimeOff;
+
+    /* Chrome can lay a prerendered or background page out for metrics that
+       were never real, and it fires no resize when the real ones arrive.
+       While actually painting, make sure the room still measures what we
+       laid out for — once a second, not every frame. */
+    if (++dimCheck >= 60) {
+      dimCheck = 0;
+      if (w !== window.innerWidth || h !== window.innerHeight) resize();
+    }
 
     stepJob();
 
@@ -649,10 +661,29 @@
     swirlAmp += (connecting - swirlAmp) * (connecting > swirlAmp ? 0.07 : 0.012);
     var dtF = Math.min(0.05, Math.max(0, t - lastT));
     lastT = t;
-    spinAngle += dtF * (0.22 + 2.3 * swirlAmp);
     var tiltNow = 0.42 + 0.28 * Math.sin(t * 0.13);
     var cosTl = Math.cos(tiltNow), sinTl = Math.sin(tiltNow);
-    var caS = Math.cos(spinAngle), saS = Math.sin(spinAngle);
+
+    /* the turn is physical: at rest the dots themselves orbit the tilted
+       axis, so the screen always shows where they really are — a flight
+       begins from exactly what is visible and lands with nothing left to
+       snap, and a formation in flight is never twisted by a rotation that
+       kept running underneath it. While anything is forming, flying, or
+       being shown, the ball simply does not turn. */
+    if (resting && !seg && !job) {
+      var dA = dtF * (0.22 + 2.3 * swirlAmp);
+      var caD = Math.cos(dA), saD = Math.sin(dA);
+      for (var ri = 0; ri < N; ri++) {
+        var rx = px[ri] - cx, ry = py[ri] - cy, rz = pz[ri];
+        var v1 = ry * cosTl - rz * sinTl;
+        var v2 = ry * sinTl + rz * cosTl;
+        var nx1 = rx * caD + v2 * saD;
+        v2 = -rx * saD + v2 * caD;
+        px[ri] = cx + nx1;
+        py[ri] = cy + (v1 * cosTl + v2 * sinTl);
+        pz[ri] = -v1 * sinTl + v2 * cosTl;
+      }
+    }
 
     /* the moment it connects: a wave of colour travels around the ball with
        that same motion, then it settles back to its own white */
@@ -676,16 +707,6 @@
       var z = pz[i] + dz * driftAmp;
 
       if (resting && i < coreN) {
-        /* lean the axis, turn the ball around it, lean back — the same
-           angle for every dot, so the sphere moves as one body */
-        var ty2 = y * cosTl - z * sinTl;
-        var tz2 = y * sinTl + z * cosTl;
-        var nx = x * caS + tz2 * saS;
-        tz2 = -x * saS + tz2 * caS;
-        x = nx;
-        y = ty2 * cosTl + tz2 * sinTl;
-        z = -ty2 * sinTl + tz2 * cosTl;
-
         /* the voice breathes through it in 3D: every dot slides out along
            its own line from the centre and back, each on its own beat —
            expansion and retraction, not a flat scale */
@@ -766,15 +787,17 @@
        while moving every edge, and the clamps mean whole classes of resize
        land on the same count too. Debounced: a drag fires this a hundred
        times and each re-fit is real work. */
-    if ((w !== prevW || h !== prevH) && prevW) {
+    if (w !== prevW || h !== prevH) {
       clearTimeout(refit);
       refit = setTimeout(function () {
         /* re-fit whatever the room holds: the formation, or the resting
            sphere — its positions are absolute too, and a dot-count change
-           even re-randomizes them */
+           even re-randomizes them. A page that started degenerate (0x0, or
+           metrics that were never real) re-fits at once, not debounced —
+           there is nothing on screen worth easing from. */
         if (Dots.showing) replay(Dots.showing, { duration: 0.9 });
         else Dots.rest({ duration: 0.9 });
-      }, 180);
+      }, prevW ? 180 : 0);
     }
   }
 
@@ -942,10 +965,20 @@
       sphereInto(buf.x, buf.y, buf.z, buf.b, N, rng(77));
       Dots.showing = null;
       resting = true;
-      begin(buf.x, buf.y, buf.z, buf.b, {
+      /* pair each dot with a nearby shell slot, exactly as show() pairs them
+         with a formation — by raw index the paths cross and the formation
+         scrambles into a third shape mid-flight instead of gathering */
+      var perm = assign(px, py, buf.x, buf.y, N);
+      var ax = new Float32Array(N), ay = new Float32Array(N),
+          az = new Float32Array(N), ab = new Float32Array(N);
+      for (var i = 0; i < N; i++) {
+        var j = perm[i];
+        ax[i] = buf.x[j]; ay[i] = buf.y[j]; az[i] = buf.z[j]; ab[i] = buf.b[j];
+      }
+      begin(ax, ay, az, ab, {
         duration: opts.duration != null ? opts.duration : 1.5,
-        stagger: 0.28,
-        arc: 0.18,
+        stagger: 0.16,
+        arc: 0.12,
         hold: false,
         alpha: 1
       });
@@ -969,6 +1002,12 @@
   window.Dots = Dots;
 
   window.addEventListener('resize', resize);
+  /* a page shown after loading in the background gets its first honest
+     measurements now — and Chrome fires no resize event for that */
+  window.addEventListener('pageshow', resize);
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden) resize();
+  });
   window.addEventListener('orientationchange', resize);
 
   var mq = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
