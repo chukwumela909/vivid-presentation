@@ -95,16 +95,26 @@
 
     var px = rctx.getImageData(0, 0, rw, rh).data;
     var d = new Float32Array(rw * rh);
-    var total = 0;
+    var mk = new Float32Array(rw * rh);
+    var total = 0, marked = 0;
     for (var i = 0, j = 0; i < d.length; i++, j += 4) {
       /* alpha carries the shape; luminance carries a picture's tone */
       var a = px[j + 3] / 255;
-      var lum = a ? (0.299 * px[j] + 0.587 * px[j + 1] + 0.114 * px[j + 2]) / 255 : 0;
+      var r = px[j], g = px[j + 1], b = px[j + 2];
+      var mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
+      var mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      /* a colour in a target is an instruction, not a tone: these dots are
+         drawn in colour, and their weight is the colour's strongest channel
+         — otherwise anything but white would thin out for being "darker" */
+      var chroma = (mx - mn) / 255;
+      var lum = a ? (chroma > 0.15 ? mx / 255
+                                   : (0.299 * r + 0.587 * g + 0.114 * b) / 255) : 0;
       var v = a * lum;
       d[i] = v;
+      if (chroma > 0.15) { mk[i] = Math.min(1, chroma * 1.6); marked += v; }
       total += v;
     }
-    return total > 0 ? { d: d, w: rw, h: rh } : null;
+    return total > 0 ? { d: d, mk: marked > 0 ? mk : null, w: rw, h: rh } : null;
   }
 
   function fitFont(rctx2, text, boxW, boxH) {
@@ -162,7 +172,11 @@
       var x = (W - total) / 2;
       for (k = 0; k < parts.length; k++) {
         var g = Math.round(255 * (parts[k].l != null ? parts[k].l : 1));
-        c.fillStyle = 'rgb(' + g + ',' + g + ',' + g + ')';
+        /* a part asking for colour is drawn in colour: the raster is the
+           instruction sheet, and rasterize() reads chroma as "these dots
+           are coloured" without docking them for not being white */
+        c.fillStyle = parts[k].rgb ? 'rgb(' + g + ',0,0)'
+                                   : 'rgb(' + g + ',' + g + ',' + g + ')';
         c.fillText(parts[k].t, x, H / 2);
         x += widths[k];
       }
@@ -426,6 +440,7 @@
   var px, py, pz, pb;                 /* live position + brightness */
   var fx, fy, fz, fb;                 /* where each dot is flying from */
   var tx, ty, tz, tb;                 /* and to */
+  var pc, fc, tc;                     /* and how much colour it carries */
   var delay, arcX, arcY, arcZ;
   var w1, w2, ph1, ph2;               /* per-dot drift */
 
@@ -449,6 +464,8 @@
     px = new Float32Array(n); py = new Float32Array(n); pz = new Float32Array(n); pb = new Float32Array(n);
     fx = new Float32Array(n); fy = new Float32Array(n); fz = new Float32Array(n); fb = new Float32Array(n);
     tx = new Float32Array(n); ty = new Float32Array(n); tz = new Float32Array(n); tb = new Float32Array(n);
+    /* how much colour each dot carries: 0 is the everyday white */
+    pc = new Float32Array(n); fc = new Float32Array(n); tc = new Float32Array(n);
     delay = new Float32Array(n);
     arcX = new Float32Array(n); arcY = new Float32Array(n); arcZ = new Float32Array(n);
     w1 = new Float32Array(n * 3); w2 = new Float32Array(n * 3);
@@ -536,6 +553,8 @@
       fx[i] = px[i]; fy[i] = py[i]; fz[i] = pz[i]; fb[i] = pb[i];
       tx[i] = nextX[i]; ty[i] = nextY[i]; tz[i] = nextZ[i];
       tb[i] = nextB ? nextB[i] : 1;
+      fc[i] = pc[i];
+      tc[i] = opts.colour ? opts.colour[i] : 0;
       delay[i] = stagger > 0 ? rand() * stagger : 0;
 
       if (arc > 0) {
@@ -596,6 +615,7 @@
         py[i] = fy[i] + (ty[i] - fy[i]) * e + arcY[i] * bow;
         pz[i] = fz[i] + (tz[i] - fz[i]) * e + arcZ[i] * bow;
         pb[i] = fb[i] + (tb[i] - fb[i]) * e;
+        pc[i] = fc[i] + (tc[i] - fc[i]) * e;
       }
       if (p >= 1) seg = null;
     }
@@ -758,16 +778,29 @@
       if (av <= 0.004) continue;
       var r = DOT_R * persp;
       var base = sprite;              /* white is the everyday colour */
-      if (rgbK > 0.01 && !(resting && i >= coreN)) {
-        /* the connect shimmer: full colour crossfades in over the dot's own
-           tint and back out. The hue is not striped by index — it is a wave
-           travelling around the ball, read from where the dot actually is,
-           the same motion the spin has, in colour. The dust sits it out. */
-        ctx.globalAlpha = Math.min(1, av * (1 - rgbK * 0.7));
+      /* two things can colour a dot: the connecting moment, which takes the
+         whole field, and the dot's own place in a formation that asked for
+         colour — the 26 in NEU 26. Whichever is stronger wins the dot. */
+      var own = pc[i];
+      var mix = own > rgbK ? own : rgbK;
+      if (mix > 0.01) {
+        /* full colour crossfades in over the white and back out. The hue is
+           not striped by index — it is a wave travelling across the dots,
+           read from where each one actually is: around the ball for the
+           connect shimmer, across the letters for a coloured formation. */
+        /* a hue sprite carries less light than white, and the coloured part
+           of a formation is the emphasis — give it back its weight */
+        var avc = own > rgbK ? av * 1.35 : av;
+        ctx.globalAlpha = Math.min(1, avc * (1 - mix * 0.7));
         ctx.drawImage(base, sx[i] - r, sy[i] - r, r * 2, r * 2);
-        ctx.globalAlpha = Math.min(1, av * rgbK);
-        var aRound = Math.atan2(sz[i], sx[i] - cx - lean.x);
-        var huePos = ((aRound / 6.2832 + t * 0.4) % 1 + 1) % 1;
+        ctx.globalAlpha = Math.min(1, avc * mix);
+        var huePos;
+        if (own > rgbK) {
+          huePos = ((sx[i] / w * 2.2 + sy[i] / h * 0.4 + t * 0.25) % 1 + 1) % 1;
+        } else {
+          var aRound = Math.atan2(sz[i], sx[i] - cx - lean.x);
+          huePos = ((aRound / 6.2832 + t * 0.4) % 1 + 1) % 1;
+        }
         ctx.drawImage(HUES[(huePos * HUES.length) | 0], sx[i] - r, sy[i] - r, r * 2, r * 2);
       } else {
         ctx.globalAlpha = Math.min(1, av);
@@ -843,6 +876,7 @@
     if (!buf.x || buf.x.length !== N) {
       buf.x = new Float32Array(N); buf.y = new Float32Array(N);
       buf.z = new Float32Array(N); buf.b = new Float32Array(N);
+      buf.c = new Float32Array(N);
     }
   }
 
@@ -864,8 +898,10 @@
       buf.z[i] = (rand() * 2 - 1) * Math.min(w, h) * 0.035;
       var pxi = Math.min(mw - 1, Math.max(0, x | 0));
       var pyi = Math.min(map.h - 1, Math.max(0, y | 0));
-      var v = d[pyi * mw + pxi];
+      var cell = pyi * mw + pxi;
+      var v = d[cell];
       buf.b[i] = 0.55 + 0.45 * Math.min(1, v);
+      buf.c[i] = map.mk ? map.mk[cell] : 0;
     }
     return buf;
   }
@@ -878,7 +914,7 @@
     opts = opts || {};
     var map = null;
     if (spec.kind === 'word') map = targetText(String(spec.text || '').trim().slice(0, 40));
-    else if (spec.kind === 'neu') map = targetText('NEU 26', [{ t: 'NEU ', l: 0.52 }, { t: '26', l: 1 }]);
+    else if (spec.kind === 'neu') map = targetText('NEU 26', [{ t: 'NEU ', l: 0.52 }, { t: '26', l: 1, rgb: true }]);
     else if (spec.kind === 'shape') map = targetShape(spec.shape);
     else if (spec.kind === 'image') map = targetImage(spec.image);
 
@@ -906,10 +942,12 @@
     var b = place(job.st, N, job.seed);
     var perm = assign(px, py, b.x, b.y, N);
     var ax = new Float32Array(N), ay = new Float32Array(N),
-        az = new Float32Array(N), ab = new Float32Array(N);
+        az = new Float32Array(N), ab = new Float32Array(N),
+        ac = new Float32Array(N);
     for (var i = 0; i < N; i++) {
       var j = perm[i];
       ax[i] = b.x[j]; ay[i] = b.y[j]; az[i] = b.z[j]; ab[i] = b.b[j];
+      ac[i] = b.c[j];
     }
     var opts = job.opts, seed = job.seed;
     job = null;
@@ -918,6 +956,7 @@
       hold: opts.hold,
       seed: seed,
       spin: opts.spin != null ? opts.spin : 0,
+      colour: ac,
       alpha: 1
     });
   }
@@ -1123,6 +1162,7 @@
       },
       phase: function (p) { phase = p; },
       tick: function () { ambientLoop(); },
+      show: function (spec, opts) { return show(spec, opts); },
       warp: function (s) { amb.last -= s; amb.quiet -= s; talk.cool -= s; },
       probe: function () {
         return { phase: phase, vphase: Vivid && Vivid.phase, showing: !!Dots.showing,
