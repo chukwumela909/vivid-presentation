@@ -86,20 +86,33 @@ nowhere else — nothing is sent anywhere. `VividMemory.read()` and
 ## The dots
 
 `dots.js` is the whole picture. A field of ~1200–3000 dots (sized to the
-viewport) rests as a sphere with a thin dust field around it. It reacts to the
-session's moods on its own: the sphere swells with the agent's voice, spirals
-like a vortex while connecting, and runs a two-second colour shimmer the
-moment a session opens, settling back to white. The session clock is a ring
-of dots that thins as the minutes run down.
+viewport) rests as a sphere — every dot on it, so anything it forms pours out
+of the orb and gathers back into it. It reacts to the session's moods on its
+own: the sphere turns slowly and breathes with the agent's voice, spins up in
+colour while connecting, and drains back to white once the line is open.
+Colour means connecting and nothing else. In a lull it entertains itself —
+NEU 26 with the 26 in colour, the LoveWorld mark in gold, a word, a wave —
+and the session clock arrives as a formation in a quiet gap rather than as
+chrome.
 
 The agent rearranges it with the `show_dots` tool — merged into the session
 the same way `run_task` is:
 
 - `word` — the dots spell out short text
-- `shape` — circle, ring, heart, star, spiral, hexagon, triangle
+- `shape` — loveworld, heart, hand, circle, ring, star, spiral, hexagon, triangle
 - `burst` — every dot flung across the whole screen
 - `auto` — an ambient cycle that runs by itself
 - `rest` — back to the sphere
+
+`set_theme` turns the room over: `dark` is a black room and dots of white
+light, `light` is a paper-white room and dots of ink. Neither side is pure —
+paper rather than white, ink rather than black — and the dots invert
+themselves off the same `data-theme` attribute the CSS reads.
+
+Colour is a property of the target, not a special case: anything drawn in
+colour makes coloured dots. The rasteriser reads chroma as an instruction and
+takes the strongest channel as the weight, so gold is not docked for being
+darker than white.
 
 How a formation is built, all in this one file, nothing imported: the target
 is drawn to a small offscreen canvas, read back as a density map, importance-
@@ -108,8 +121,8 @@ main thread never hitches mid-sentence); the dots are then paired to the new
 arrangement along a Hilbert curve so neighbours travel together and every
 position gets exactly one dot, and they fly there on curved, staggered paths.
 
-From the console: `Dots.word('hello')`, `Dots.shape('heart')`,
-`Dots.burst()`, `Dots.auto(true)`, `Dots.rest()`.
+From the console: `Dots.word('hello')`, `Dots.shape('loveworld')`,
+`Dots.burst()`, `Dots.auto(true)`, `Dots.rest()`, `Dots.theme('light')`.
 
 ## Background tasks
 

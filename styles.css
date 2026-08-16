@@ -15,7 +15,24 @@
   --hint-size: clamp(11px, 1.15vmin + 8px, 14px);
   --font: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
     Roboto, "Helvetica Neue", Arial, sans-serif;
+
+  --skin: 260ms ease;
 }
+
+/* ---------- the light room ----------
+   Vivid can turn the room over mid-sentence (set_theme). Neither side is
+   ever pure: paper rather than white, ink rather than black, so the dots
+   read as depth instead of as printer's dirt. dots.js inverts the dots
+   themselves off this same attribute. */
+:root[data-theme="light"] {
+  --void: #f2f1ec;
+  --void-lift: #ffffff;
+  --ink: rgba(18, 18, 24, 0.66);
+  --ink-dim: rgba(18, 18, 24, 0.34);
+  --ring: rgba(18, 18, 24, 0.5);
+}
+
+html, body { transition: background-color var(--skin); }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -73,8 +90,8 @@ body {
 
 /* keyboard users still need to know where they are */
 .tap:focus-visible .tap__hint {
-  color: rgba(255, 255, 255, 0.85);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--ink-dim);
 }
 
 .tap__hint {

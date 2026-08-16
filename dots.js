@@ -745,38 +745,48 @@
     if (!raf) raf = requestAnimationFrame(frame);
   }
 
-  /* one white dot, drawn once, stamped everywhere */
-  var sprite = document.createElement('canvas');
-  (function buildSprite() {
+  /* one dot, drawn once, stamped everywhere */
+  function makeSprite(core, edge) {
+    var c = document.createElement('canvas');
     var S = 32;
-    sprite.width = sprite.height = S;
-    var s = sprite.getContext('2d');
+    c.width = c.height = S;
+    var s = c.getContext('2d');
     var g = s.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-    g.addColorStop(0, 'rgba(255,255,255,1)');
-    g.addColorStop(0.62, 'rgba(255,255,255,1)');
-    g.addColorStop(1, 'rgba(255,255,255,0)');
+    g.addColorStop(0, core);
+    g.addColorStop(0.62, core);
+    g.addColorStop(1, edge);
     s.fillStyle = g;
     s.fillRect(0, 0, S, S);
-  })();
+    return c;
+  }
 
-  /* ...and a ring of coloured ones, for the connecting moment only */
-  var HUES = (function () {
+  function hueRing(light) {
     var out = [];
     for (var hdeg = 0; hdeg < 360; hdeg += 15) {
-      var c = document.createElement('canvas');
-      var S = 32;
-      c.width = c.height = S;
-      var s = c.getContext('2d');
-      var g = s.createRadialGradient(S / 2, S / 2, 0, S / 2, S / 2, S / 2);
-      g.addColorStop(0, 'hsla(' + hdeg + ',100%,68%,1)');
-      g.addColorStop(0.62, 'hsla(' + hdeg + ',100%,62%,1)');
-      g.addColorStop(1, 'hsla(' + hdeg + ',100%,62%,0)');
-      s.fillStyle = g;
-      s.fillRect(0, 0, S, S);
-      out.push(c);
+      out.push(makeSprite('hsla(' + hdeg + ',100%,' + light + '%,1)',
+                          'hsla(' + hdeg + ',100%,' + light + '%,0)'));
     }
     return out;
-  })();
+  }
+
+  /* The room has two skins, and a dot has to be the opposite of whichever
+     one it is standing on. On black the dots are white light and pile up
+     additively; on white they are near-black ink — never a flat black,
+     which reads as dirt rather than as depth — and they lay over each
+     other instead. Colour needs to darken to survive a white ground. */
+  var SKIN = {
+    dark: {
+      sprite: makeSprite('rgba(255,255,255,1)', 'rgba(255,255,255,0)'),
+      hues: hueRing(62),
+      blend: 'lighter'
+    },
+    light: {
+      sprite: makeSprite('rgba(22,22,28,1)', 'rgba(22,22,28,0)'),
+      hues: hueRing(38),
+      blend: 'source-over'
+    }
+  };
+  var theme = 'dark';
 
   function draw(t) {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -878,10 +888,12 @@
       sz[i] = -x * sinT + z * cosT;
     }
 
-    /* the dots are drawn additively, and addition does not care what order
-       it happens in — so there is no depth sort here to pay for. Depth is
-       carried by size and brightness alone. */
-    ctx.globalCompositeOperation = 'lighter';
+    /* On black the dots are drawn additively, and addition does not care
+       what order it happens in — so there is no depth sort here to pay
+       for. Depth is carried by size and brightness alone. On white they
+       are ink, and ink is laid down normally. */
+    var skin = SKIN[theme];
+    ctx.globalCompositeOperation = skin.blend;
     for (i = 0; i < N; i++) {
       var zc = Math.min(sz[i], 0.8 * cam);
       var persp = cam / (cam - zc);
@@ -890,7 +902,7 @@
       var av = alpha * pb[i] * shade * lift;
       if (av <= 0.004) continue;
       var r = DOT_R * persp;
-      var base = sprite;              /* white is the everyday colour */
+      var base = skin.sprite;         /* white on black, ink on white */
       /* two things can colour a dot: the connecting moment, which takes the
          whole field, and the dot's own place in a formation that asked for
          colour — the 26 in NEU 26. Whichever is stronger wins the dot. */
@@ -918,7 +930,8 @@
           var aRound = Math.atan2(sz[i], sx[i] - cx - lean.x);
           huePos = ((aRound / 6.2832 + t * 0.4) % 1 + 1) % 1;
         }
-        ctx.drawImage(HUES[(huePos * HUES.length) | 0], sx[i] - r, sy[i] - r, r * 2, r * 2);
+        ctx.drawImage(skin.hues[(huePos * skin.hues.length) | 0],
+                      sx[i] - r, sy[i] - r, r * 2, r * 2);
       } else {
         ctx.globalAlpha = Math.min(1, av);
         ctx.drawImage(base, sx[i] - r, sy[i] - r, r * 2, r * 2);
@@ -1170,6 +1183,18 @@
 
     /* kept so `clear` in the tool still reads naturally in code */
     clear: function (opts) { return Dots.rest(opts); },
+
+    /* The room's skin. The dots invert to stay legible against it, and
+       the page follows through CSS off the same attribute. */
+    theme: function (name) {
+      var want = name === 'light' ? 'light' : 'dark';
+      if (want !== theme) {
+        theme = want;
+        document.documentElement.setAttribute('data-theme', theme);
+        start();
+      }
+      return theme;
+    },
 
     auto: function (on) {
       auto.on = on !== false;
@@ -1452,10 +1477,34 @@
     }
   };
 
+  var THEME_TOOL = {
+    type: 'function',
+    name: 'set_theme',
+    description:
+      'Turn the room light or dark. Dark is how it lives: a black room, dots of white light. Light turns the room ' +
+      'white and the dots to ink. Use it when someone asks — "make it light", "dark mode", "too bright" — or when ' +
+      'the moment genuinely calls for it. Do it while you keep talking; never announce it and never mention themes, ' +
+      'screens or tools out loud.',
+    parameters: {
+      type: 'object',
+      properties: {
+        theme: {
+          type: 'string',
+          enum: ['light', 'dark'],
+          description: 'light — white room, dark dots. dark — black room, dots of light.'
+        }
+      },
+      required: ['theme'],
+      additionalProperties: false
+    }
+  };
+
   var NOTE = [
     'On their screen you are a sphere of dots that moves with your voice. The show_dots tool rearranges those dots',
-    'into a word, a shape, a burst, or back to the sphere. Use it now and then for emphasis, never narrate it, never',
-    'say the words "dots", "screen", "show" or "tool" out loud, and never read out what it spells. Keep talking as normal.'
+    'into a word, a shape, a burst, or back to the sphere — use it now and then for emphasis, and whenever someone',
+    'asks you to put something on the screen. The set_theme tool turns the room light or dark, which is yours to do',
+    'the moment anyone asks. Never narrate either one, never say the words "dots", "screen", "theme", "show" or',
+    '"tool" out loud, and never read out what it spells. Just do it, and keep talking as normal.'
   ].join(' ');
 
   var attempts = 0;
@@ -1473,10 +1522,14 @@
      so whichever lands second would drop the other's tool. Re-adding ourselves
      whenever we are missing converges instead — each update echoes back a
      fuller session, and we stop as soon as show_dots is in it. */
+  var OURS = [TOOL, THEME_TOOL];
+
   function register(session) {
     var tools = Array.isArray(session.tools) ? session.tools.slice() : [];
-    var has = tools.some(function (t) { return t && t.name === TOOL.name; });
-    if (has || attempts >= 4) return;
+    var missing = OURS.filter(function (mine) {
+      return !tools.some(function (t) { return t && t.name === mine.name; });
+    });
+    if (!missing.length || attempts >= 4) return;
     attempts++;
 
     var patch = {};
@@ -1487,22 +1540,27 @@
       : base.indexOf(NOTE) !== -1 ? base          /* already carried over */
       : base + '\n\n' + NOTE;
 
-    tools.push(TOOL);
-    patch.tools = tools;
+    patch.tools = tools.concat(missing);
     patch.tool_choice = 'auto';
 
     Vivid.send({ type: 'session.update', session: patch });
-    note('show_dots joined the session (attempt ' + attempts + ', ' + tools.length + ' tools)');
+    note('joined the session (attempt ' + attempts + '): ' +
+         missing.map(function (m) { return m.name; }).join(', '));
   }
 
   function harvest(response) {
     var output = Array.isArray(response.output) ? response.output : [];
     output.forEach(function (item) {
-      if (!item || item.type !== 'function_call' || item.name !== TOOL.name) return;
+      if (!item || item.type !== 'function_call') return;
+      if (item.name !== TOOL.name && item.name !== THEME_TOOL.name) return;
 
       var args = {};
       try { args = JSON.parse(item.arguments || '{}'); } catch (err) {}
 
+      if (item.name === THEME_TOOL.name) {
+        results[item.call_id] = 'Done. The room is ' + Dots.theme(args.theme) + ' now.';
+        return;
+      }
       results[item.call_id] = run(args) ? 'Done.' : 'Nothing shown.';
     });
   }
