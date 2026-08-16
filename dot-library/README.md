@@ -78,16 +78,20 @@ field.save("spot.gif", fps=30)      # or .mp4, or a folder of PNG frames
 | --- | --- |
 | `dl.text("HI", font=None)` | Renders the string (any system font), fills the glyphs with evenly arranged dots |
 | `dl.image(src, color=False, tone="auto", gamma=1.6, edges=0.0)` | Stipples a photo/array: dot density follows brightness, `color=True` samples the image's colors per dot, `edges` blends in outline emphasis |
-| `dl.face(src, boost=2.6, color=False, crop=True, segment=True)` | `image` + face detection: zooms into the detected face (`crop=False` keeps full framing), **segments out the head so the background gets zero dots** (`segment=False` keeps it), and boosts density on the face — eyes/mouth especially — so portraits read clearly |
-| `dl.points(arr, colors=None)` | Your own `(n, 2)` point set — the hook for external models (landmarks, meshes, generative output) |
+| `dl.face(src, structure=True, depth=True, frontalize=True, crop=True, color=False)` | The face sculpture: 478-landmark relief + FLAME head shell, background/neck/back-of-head removed, pose canonicalized to frontal, and 18 tagged anatomy layers (lips, lids, jaw, brows, teeth, tongue, cavity, sclera/iris/pupil) for expression animation. `structure=False` uses tone-based density, `color=True` samples the photo's colors, `frontalize=False` keeps the captured angle |
+| `dl.points(arr, colors=None)` | Your own `(n, 2)` or `(n, 3)` point set — the hook for external models (landmarks, meshes, generative output) |
 | `dl.circle() / ring() / polygon(6) / star() / heart() / spiral()` | Geometric formations |
 | `dl.scatter()` | Uniform cloud (the resting state) |
 
 ## Timeline verbs
 
-- `field.morph_to(target, duration, easing="cubic", stagger=0.35, match_method="auto")`
-- `field.hold(duration, drift=...)` — keep formation; dots keep a gentle organic drift
-- `field.disperse(duration, style="drift" | "explode", fade=False)`
+- `field.morph_to(target, duration, easing="cubic", stagger=0.35, arc=0.22, spin=None, sway=None, match_method="auto")`
+- `field.hold(duration, drift=..., spin=..., sway=...)` — keep formation; dots keep a gentle organic drift
+- `field.disperse(duration, style="drift" | "fill" | "explode", fade=False)` — `fill` floods the whole canvas
+
+`arc` bows each dot off its straight line (peaking mid-flight, exact at both
+ends) so morphs swoop instead of sliding. `spin` rotates continuously; `sway`
+oscillates instead — the right choice for a single-view face.
 
 Easings: `linear, quad, cubic, quint, expo, back (overshoot), elastic`.
 `stagger` staggers per-dot start times so formations ripple in instead of
@@ -120,11 +124,14 @@ python web/server.py        # open http://127.0.0.1:5177
 ```
 
 - **Enable camera** → auto-scans once: your face forms out of the idle cloud
-  as a monochrome 3D head — a predefined closed egg of dots (it has a back;
-  it can turn fully and disperses gracefully) carrying your scanned **face
-  structure** on its front: landmark-true relief, presented forward no matter
-  what angle the camera caught (`frontalize`), swaying ±22°. Nothing else
-  from the image — no background, neck, or shoulders — enters the sculpture.
+  as a monochrome 3D **face sculpture** — your landmark-true relief carried on
+  a shallow FLAME head shell (crown, temples, cheeks; the back of the head is
+  culled), presented forward no matter what angle the camera caught
+  (`frontalize`). Nothing else from the image — no background, neck, or
+  shoulders — enters it.
+- **Drag the head** → rotation belongs to you: drag to turn (yaw) and nod
+  (pitch); it holds, then eases back to front. The sculpture never spins on
+  its own — its life comes from breathing, drift, blinks, and gaze.
 - **Live** → re-scans every ~2.4 s, so the dots keep tracking you as you move.
 - **Word / Shape** → the same dots morph into any typed word or a cycling
   shape (heart, star, ring, spiral, polygon), then back.
