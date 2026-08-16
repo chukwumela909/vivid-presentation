@@ -96,6 +96,7 @@
     var px = rctx.getImageData(0, 0, rw, rh).data;
     var d = new Float32Array(rw * rh);
     var mk = new Float32Array(rw * rh);
+    var hu = new Float32Array(rw * rh);
     var total = 0, marked = 0;
     for (var i = 0, j = 0; i < d.length; i++, j += 4) {
       /* alpha carries the shape; luminance carries a picture's tone */
@@ -104,17 +105,28 @@
       var mx = r > g ? (r > b ? r : b) : (g > b ? g : b);
       var mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
       /* a colour in a target is an instruction, not a tone: these dots are
-         drawn in colour, and their weight is the colour's strongest channel
-         — otherwise anything but white would thin out for being "darker" */
+         drawn in that colour, and their weight is its strongest channel —
+         otherwise anything but white would thin out for being "darker" */
       var chroma = (mx - mn) / 255;
       var lum = a ? (chroma > 0.15 ? mx / 255
                                    : (0.299 * r + 0.587 * g + 0.114 * b) / 255) : 0;
       var v = a * lum;
       d[i] = v;
-      if (chroma > 0.15) { mk[i] = Math.min(1, chroma * 1.6); marked += v; }
+      if (chroma > 0.15) {
+        var span = mx - mn;
+        var hh = mx === r ? (g - b) / span
+               : mx === g ? (b - r) / span + 2
+                          : (r - g) / span + 4;
+        hh /= 6;
+        hu[i] = hh < 0 ? hh + 1 : hh;
+        mk[i] = Math.min(1, chroma * 1.6);
+        marked += v;
+      }
       total += v;
     }
-    return total > 0 ? { d: d, mk: marked > 0 ? mk : null, w: rw, h: rh } : null;
+    return total > 0
+      ? { d: d, mk: marked > 0 ? mk : null, hue: marked > 0 ? hu : null, w: rw, h: rh }
+      : null;
   }
 
   function fitFont(rctx2, text, boxW, boxH) {
@@ -174,9 +186,18 @@
         var g = Math.round(255 * (parts[k].l != null ? parts[k].l : 1));
         /* a part asking for colour is drawn in colour: the raster is the
            instruction sheet, and rasterize() reads chroma as "these dots
-           are coloured" without docking them for not being white */
-        c.fillStyle = parts[k].rgb ? 'rgb(' + g + ',0,0)'
-                                   : 'rgb(' + g + ',' + g + ',' + g + ')';
+           are coloured, in this hue" without docking them for not being
+           white. A rainbow across the glyphs makes every dot a different
+           one, and the slow drift in draw() sets the whole thing moving. */
+        if (parts[k].rgb) {
+          var grad = c.createLinearGradient(x, 0, x + widths[k], 0);
+          for (var q = 0; q <= 6; q++) {
+            grad.addColorStop(q / 6, 'hsl(' + Math.round(q * 58) + ',100%,55%)');
+          }
+          c.fillStyle = grad;
+        } else {
+          c.fillStyle = 'rgb(' + g + ',' + g + ',' + g + ')';
+        }
         c.fillText(parts[k].t, x, H / 2);
         x += widths[k];
       }
@@ -202,6 +223,86 @@
       }
       c.closePath(); c.fill();
     },
+    /* the LoveWorld mark: a heart with the world inside it, a ring around
+       the whole thing, and the name across the middle — drawn in its own
+       gold, which is all it takes to make the dots gold too */
+    loveworld: function (c, W, H, r) {
+      var cx = W / 2, cy = H / 2, s = r / 100;
+      var gold = '#ffbe28';
+      c.strokeStyle = gold;
+      c.fillStyle = gold;
+      c.lineJoin = 'round';
+      c.lineCap = 'round';
+
+      /* Round lobes, a deep cleft and a short point. The textbook
+         parametric heart has a long tail that reads as a diamond the
+         moment it is only an outline, so this is drawn as a heart is
+         drawn: two shoulders falling into a point. */
+      function B(x1, y1, x2, y2, x3, y3) {
+        c.bezierCurveTo(cx + x1 * r, cy + y1 * r, cx + x2 * r, cy + y2 * r,
+                        cx + x3 * r, cy + y3 * r);
+      }
+      c.beginPath();
+      c.moveTo(cx, cy + 0.78 * r);                     /* the point, kept short */
+      B(-0.42, 0.58, -0.86, 0.34, -0.92, 0.02);        /* up the left side */
+      B(-0.98, -0.40, -0.74, -0.74, -0.32, -0.66);     /* around the left lobe */
+      B(-0.13, -0.62, -0.03, -0.44, 0, -0.26);         /* into the cleft */
+      B(0.03, -0.44, 0.13, -0.62, 0.32, -0.66);
+      B(0.74, -0.74, 0.98, -0.40, 0.92, 0.02);
+      B(0.86, 0.34, 0.42, 0.58, 0, 0.78);
+      c.closePath();
+
+      /* the heart, as an outline with weight */
+      c.lineWidth = 11 * s;
+      c.stroke();
+
+      /* The world, inside the heart rather than beside it: the globe's
+         grid is clipped to the heart itself, so the heart IS the world.
+         A circle of its own only competes with the outline. */
+      c.save();
+      c.clip();
+      c.lineWidth = 5.5 * s;
+      var R = r * 0.86, gy = cy - r * 0.04;
+      var mer = [0.34, 0.68];
+      for (var k = 0; k < mer.length; k++) {
+        c.beginPath();
+        if (c.ellipse) c.ellipse(cx, gy, R * mer[k], R, 0, 0, 6.2832);
+        c.stroke();
+      }
+      var par = [-0.62, -0.28, 0.30];
+      for (var p = 0; p < par.length; p++) {
+        var yy = gy + R * par[p];
+        c.beginPath();
+        c.moveTo(cx - r, yy);
+        c.lineTo(cx + r, yy);
+        c.stroke();
+      }
+      c.restore();
+
+      /* the ring the whole mark sits in — barely wider than the heart, or
+         it stops being a ring and starts being the silhouette */
+      c.lineWidth = 7 * s;
+      c.beginPath();
+      if (c.ellipse) c.ellipse(cx, cy + r * 0.10, r * 1.14, r * 0.26, -0.05, 0, 6.2832);
+      c.stroke();
+
+      /* and the name, sitting on the ring — cut out of the globe behind it
+         so it is read as type, not as more grid */
+      var fs = Math.round(r * 0.29);
+      c.font = '700 ' + fs + 'px ' + FONT;
+      c.textAlign = 'center';
+      c.textBaseline = 'middle';
+      var ty = cy + r * 0.10;
+      var tw = c.measureText('LoveWorld').width;
+      c.save();
+      c.globalCompositeOperation = 'destination-out';
+      c.fillStyle = '#000';
+      c.fillRect(cx - tw / 2 - fs * 0.22, ty - fs * 0.62, tw + fs * 0.44, fs * 1.24);
+      c.restore();
+      c.fillStyle = gold;
+      c.fillText('LoveWorld', cx, ty);
+    },
+
     hand: function (c, W, H, r) {
       /* an open palm mid-wave, leaning the way a wave leans */
       c.save();
@@ -257,11 +358,17 @@
     c.closePath(); c.fill();
   }
 
+  /* most shapes are happy in a square; the mark with a ring around it
+     needs the room either side */
+  var SHAPE_BOX = { loveworld: [380, 300] };
+
   function targetShape(name) {
     var fn = SHAPES[name];
     if (!fn) return null;
-    var rw = 300, rh = 300;
-    return rasterize(function (c, W, H) { fn(c, W, H, Math.min(W, H) * 0.40); }, rw, rh);
+    var box = SHAPE_BOX[name] || [300, 300];
+    return rasterize(function (c, W, H) {
+      fn(c, W, H, Math.min(W, H) * 0.40);
+    }, box[0], box[1]);
   }
 
   function targetImage(img) {
@@ -441,6 +548,7 @@
   var fx, fy, fz, fb;                 /* where each dot is flying from */
   var tx, ty, tz, tb;                 /* and to */
   var pc, fc, tc;                     /* and how much colour it carries */
+  var pu;                             /* ...and which colour that is */
   var delay, arcX, arcY, arcZ;
   var w1, w2, ph1, ph2;               /* per-dot drift */
 
@@ -466,6 +574,7 @@
     tx = new Float32Array(n); ty = new Float32Array(n); tz = new Float32Array(n); tb = new Float32Array(n);
     /* how much colour each dot carries: 0 is the everyday white */
     pc = new Float32Array(n); fc = new Float32Array(n); tc = new Float32Array(n);
+    pu = new Float32Array(n);
     delay = new Float32Array(n);
     arcX = new Float32Array(n); arcY = new Float32Array(n); arcZ = new Float32Array(n);
     w1 = new Float32Array(n * 3); w2 = new Float32Array(n * 3);
@@ -555,6 +664,10 @@
       tb[i] = nextB ? nextB[i] : 1;
       fc[i] = pc[i];
       tc[i] = opts.colour ? opts.colour[i] : 0;
+      /* the hue itself does not travel — it is simply what the dot will be
+         once it has any colour at all, and the fade in and out is carried
+         by how much colour it carries */
+      if (opts.hue && tc[i] > 0.01) pu[i] = opts.hue[i];
       delay[i] = stagger > 0 ? rand() * stagger : 0;
 
       if (arc > 0) {
@@ -649,7 +762,7 @@
   /* ...and a ring of coloured ones, for the connecting moment only */
   var HUES = (function () {
     var out = [];
-    for (var hdeg = 0; hdeg < 360; hdeg += 30) {
+    for (var hdeg = 0; hdeg < 360; hdeg += 15) {
       var c = document.createElement('canvas');
       var S = 32;
       c.width = c.height = S;
@@ -796,7 +909,11 @@
         ctx.globalAlpha = Math.min(1, avc * mix);
         var huePos;
         if (own > rgbK) {
-          huePos = ((sx[i] / w * 2.2 + sy[i] / h * 0.4 + t * 0.25) % 1 + 1) % 1;
+          /* the dot's own colour, wobbling a little around itself — the
+             shimmer has to come back, or gold walks the whole wheel and
+             stops being gold */
+          var wob = 0.055 * Math.sin(t * 0.6 + ph1[i * 3] * 1.7);
+          huePos = ((pu[i] + wob) % 1 + 1) % 1;
         } else {
           var aRound = Math.atan2(sz[i], sx[i] - cx - lean.x);
           huePos = ((aRound / 6.2832 + t * 0.4) % 1 + 1) % 1;
@@ -876,7 +993,7 @@
     if (!buf.x || buf.x.length !== N) {
       buf.x = new Float32Array(N); buf.y = new Float32Array(N);
       buf.z = new Float32Array(N); buf.b = new Float32Array(N);
-      buf.c = new Float32Array(N);
+      buf.c = new Float32Array(N); buf.u = new Float32Array(N);
     }
   }
 
@@ -902,6 +1019,7 @@
       var v = d[cell];
       buf.b[i] = 0.55 + 0.45 * Math.min(1, v);
       buf.c[i] = map.mk ? map.mk[cell] : 0;
+      buf.u[i] = map.hue ? map.hue[cell] : 0;
     }
     return buf;
   }
@@ -943,11 +1061,11 @@
     var perm = assign(px, py, b.x, b.y, N);
     var ax = new Float32Array(N), ay = new Float32Array(N),
         az = new Float32Array(N), ab = new Float32Array(N),
-        ac = new Float32Array(N);
+        ac = new Float32Array(N), au = new Float32Array(N);
     for (var i = 0; i < N; i++) {
       var j = perm[i];
       ax[i] = b.x[j]; ay[i] = b.y[j]; az[i] = b.z[j]; ab[i] = b.b[j];
-      ac[i] = b.c[j];
+      ac[i] = b.c[j]; au[i] = b.u[j];
     }
     var opts = job.opts, seed = job.seed;
     job = null;
@@ -957,6 +1075,7 @@
       seed: seed,
       spin: opts.spin != null ? opts.spin : 0,
       colour: ac,
+      hue: au,
       alpha: 1
     });
   }
@@ -967,13 +1086,13 @@
   var auto = { on: false, i: 0 };
 
   var LOOP = [
-    { kind: 'shape', shape: 'circle' },
+    { kind: 'neu' },
     { kind: 'word', text: 'vivid' },
     { kind: 'shape', shape: 'heart' },
     { kind: 'burst' },
-    { kind: 'shape', shape: 'spiral' },
+    { kind: 'shape', shape: 'loveworld' },
     { kind: 'word', text: 'hello' },
-    { kind: 'shape', shape: 'star' }
+    { kind: 'shape', shape: 'hand' }
   ];
 
   function next() {
@@ -1163,6 +1282,13 @@
       phase: function (p) { phase = p; },
       tick: function () { ambientLoop(); },
       show: function (spec, opts) { return show(spec, opts); },
+      colour: function () {
+        var lit = 0, sum = 0, hmin = 9, hmax = -9;
+        for (var i = 0; i < N; i++) {
+          if (pc[i] > 0.5) { lit++; sum += pu[i]; if (pu[i] < hmin) hmin = pu[i]; if (pu[i] > hmax) hmax = pu[i]; }
+        }
+        return { n: N, coloured: lit, hueAvg: lit ? sum / lit : null, hueMin: hmin, hueMax: hmax };
+      },
       warp: function (s) { amb.last -= s; amb.quiet -= s; talk.cool -= s; },
       probe: function () {
         return { phase: phase, vphase: Vivid && Vivid.phase, showing: !!Dots.showing,
@@ -1185,12 +1311,10 @@
     { kind: 'word', text: 'vivid' },
     { kind: 'word', text: 'Hello' },
     { kind: 'shape', shape: 'hand' },
+    { kind: 'shape', shape: 'loveworld' },
     { kind: 'word', text: 'Holla' },
     { kind: 'shape', shape: 'heart' },
-    { kind: 'word', text: 'tap to talk', invite: true },
-    { kind: 'shape', shape: 'star' },
-    { kind: 'shape', shape: 'circle' },
-    { kind: 'shape', shape: 'spiral' }
+    { kind: 'word', text: 'tap to talk', invite: true }
   ];
   var amb = { i: 0, last: 0, quiet: 0, spec: null };
 
@@ -1319,7 +1443,7 @@
         },
         shape: {
           type: 'string',
-          enum: ['circle', 'ring', 'heart', 'star', 'spiral', 'hexagon', 'triangle', 'hand'],
+          enum: ['loveworld', 'heart', 'hand', 'circle', 'ring', 'star', 'spiral', 'hexagon', 'triangle'],
           description: 'shape only: which shape to form.'
         }
       },
@@ -1430,11 +1554,10 @@
     { re: /\bvivid\b|\bmy name\b|\bwho i am\b/, spec: { kind: 'word', text: 'vivid' } },
     { re: /\bhello\b|\bhi\b|\bhey\b/, spec: { kind: 'word', text: 'Hello' } },
     { re: /\bholla\b|\bhola\b/, spec: { kind: 'word', text: 'Holla' } },
+    { re: /\blove\s*world\b|\bloveworld\b|\bchurch\b|\bministry\b/,
+      spec: { kind: 'shape', shape: 'loveworld' } },
     { re: /\blove\b|\bheart\b/, spec: { kind: 'shape', shape: 'heart' } },
-    { re: /\bwaving?\b|\bwelcome\b|\bgoodbye\b|\bbye\b/, spec: { kind: 'shape', shape: 'hand' } },
-    { re: /\bstars?\b/, spec: { kind: 'shape', shape: 'star' } },
-    { re: /\bcircle\b/, spec: { kind: 'shape', shape: 'circle' } },
-    { re: /\bspiral\b/, spec: { kind: 'shape', shape: 'spiral' } }
+    { re: /\bwaving?\b|\bwelcome\b|\bgoodbye\b|\bbye\b/, spec: { kind: 'shape', shape: 'hand' } }
   ];
   var talk = { buf: '', cool: -9 };
 
