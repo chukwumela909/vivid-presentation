@@ -1,15 +1,18 @@
 # vivid-presentation
 
-A page that is nothing but **Vivid** — one orb of light on a black screen. No
-landing page, no copy, no navigation. You tap the orb and it talks to you.
+A page that is nothing but **Vivid** — a sphere of dots on a black screen. No
+landing page, no copy, no navigation. You tap and it talks to you; the dots
+breathe with its voice, spiral while it connects, shimmer through colour the
+moment the line opens, and rearrange themselves into words and shapes when the
+agent wants you to *see* something.
 
 No build step and no dependencies.
 
 ```
 index.html         the shell: a canvas, a button, seven scripts
-styles.css         the room the orb sits in
+styles.css         the room the dots sit in
 vivid-bridge.js    the seam between our pixels and the embedded widget
-orb.js             the orb — everything that moves
+dots.js            the dots — everything that moves, and the show_dots tool
 opening.js         the scripted moments, said word for word on cue
 memory.js          who it is talking to, kept in localStorage
 tasks.js           background work the agent can start mid-conversation
@@ -79,6 +82,34 @@ a real result before it reaches the model.
 Everything is stored in `localStorage` under `vivid:memory`, on that device and
 nowhere else — nothing is sent anywhere. `VividMemory.read()` and
 `VividMemory.forget()` are there for a presentation reset.
+
+## The dots
+
+`dots.js` is the whole picture. A field of ~1200–3000 dots (sized to the
+viewport) rests as a sphere with a thin dust field around it. It reacts to the
+session's moods on its own: the sphere swells with the agent's voice, spirals
+like a vortex while connecting, and runs a two-second colour shimmer the
+moment a session opens, settling back to white. The session clock is a ring
+of dots that thins as the minutes run down.
+
+The agent rearranges it with the `show_dots` tool — merged into the session
+the same way `run_task` is:
+
+- `word` — the dots spell out short text
+- `shape` — circle, ring, heart, star, spiral, hexagon, triangle
+- `burst` — every dot flung across the whole screen
+- `auto` — an ambient cycle that runs by itself
+- `rest` — back to the sphere
+
+How a formation is built, all in this one file, nothing imported: the target
+is drawn to a small offscreen canvas, read back as a density map, importance-
+sampled, and relaxed into an even stipple (one Lloyd pass per frame, so the
+main thread never hitches mid-sentence); the dots are then paired to the new
+arrangement along a Hilbert curve so neighbours travel together and every
+position gets exactly one dot, and they fly there on curved, staggered paths.
+
+From the console: `Dots.word('hello')`, `Dots.shape('heart')`,
+`Dots.burst()`, `Dots.auto(true)`, `Dots.rest()`.
 
 ## Background tasks
 

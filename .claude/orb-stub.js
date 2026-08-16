@@ -288,6 +288,17 @@
         });
       }
 
+      /* on the third, paint the room, so dots.js can be seen answering a
+         tool call the same way */
+      if (turn === 3) {
+        output.push({
+          type: 'function_call',
+          name: 'show_dots',
+          call_id: 'call_stub_' + turn,
+          arguments: JSON.stringify({ show: 'word', text: 'vivid' })
+        });
+      }
+
       farEndSend({ type: 'response.done', response: { output: output } });
     }, seconds * 1000);
     timers.push(speaking);

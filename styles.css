@@ -1,8 +1,8 @@
 /* ============================================================
-   Vivid — the orb, and nothing else
-   Near-black canvas, one luminous sphere, one line of type.
-   Everything that moves is painted in orb.js; this file only
-   holds the room the orb sits in.
+   Vivid — the dots, and nothing else
+   Near-black canvas, one sphere made of dots, one line of type.
+   Everything that moves is painted in dots.js; this file only
+   holds the room the dots sit in.
    ============================================================ */
 
 :root {
@@ -36,8 +36,10 @@ body {
   overscroll-behavior: none;
 }
 
-/* ---------- the canvas ---------- */
-#orb {
+/* ---------- the canvas ----------
+   The whole page. A field of dots that rests as a sphere, breathes with
+   the voice, and rearranges itself into whatever the agent asks for. */
+#dots {
   position: fixed;
   inset: 0;
   width: 100%;
