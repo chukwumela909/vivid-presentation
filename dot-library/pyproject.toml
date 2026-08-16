@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dotlib"
+version = "0.1.0"
+description = "Particle field engine: dots that arrange into text, shapes, and images (faces included), then disperse."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.11",
+    "pillow>=10.0",
+]
+
+[project.optional-dependencies]
+# opencv pinned <5: the 4.x wheels bundle Haar cascades, so face detection
+# works offline with no model download (OpenCV 5 removed them).
+face = ["opencv-python>=4.8,<5"]
+# mesh: MediaPipe FaceLandmarker (478 3D landmarks, 52 blendshapes, head pose)
+# — the layered face-sculpture path. Pin <0.11: the 1.x macOS wheels crash
+# requesting a Metal GPU service. Also download the model once:
+#   curl -L -o models/face_landmarker.task \
+#     https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task
+mesh = ["mediapipe>=0.10.30,<0.11"]
+video = ["imageio>=2.31", "imageio-ffmpeg>=0.4.9"]
+web = ["flask>=3.0", "opencv-python>=4.8,<5"]
+all = ["opencv-python>=4.8,<5", "mediapipe>=0.10.30,<0.11", "imageio>=2.31",
+       "imageio-ffmpeg>=0.4.9", "flask>=3.0"]
+
+[tool.setuptools.packages.find]
+include = ["dotlib*"]

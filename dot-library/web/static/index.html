@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>dotlib · face scan</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='7' fill='%23f2f3f7'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span class="brand-name">dotlib</span>
+      <span class="brand-sub">face scan</span>
+    </div>
+    <nav class="controls">
+      <input id="word-input" class="word" placeholder="type a word" maxlength="18" />
+      <button id="btn-word" class="btn">Word</button>
+      <button id="btn-shape" class="btn">Shape</button>
+      <button id="btn-talk" class="btn toggle" disabled>Talk</button>
+      <button id="btn-auto" class="btn toggle">Auto</button>
+      <span class="sep"></span>
+      <button id="btn-camera" class="btn primary">Enable camera</button>
+      <button id="btn-scan" class="btn" disabled>Scan</button>
+      <button id="btn-live" class="btn toggle" disabled>Live</button>
+      <button id="btn-disperse" class="btn">Disperse</button>
+      <button id="btn-sample" class="btn ghost hidden">Sample</button>
+    </nav>
+  </header>
+
+  <main class="stage">
+    <canvas id="dots"></canvas>
+  </main>
+
+  <footer class="hud">
+    <div class="status"><span id="status-text">starting…</span></div>
+    <div class="angles" id="angles">
+      <span class="chip">yaw <b id="a-yaw">—</b></span>
+      <span class="chip">pitch <b id="a-pitch">—</b></span>
+      <span class="chip">roll <b id="a-roll">—</b></span>
+      <span class="chip dim" id="a-backend">detector —</span>
+    </div>
+  </footer>
+
+  <video id="cam" autoplay playsinline muted class="hidden"></video>
+  <div id="toast" class="toast hidden"></div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
