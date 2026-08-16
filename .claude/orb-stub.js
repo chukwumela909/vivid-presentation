@@ -124,15 +124,7 @@
         wire = e.channel;
         wire.onmessage = function (m) { farEndHeard(JSON.parse(m.data)); };
         wire.onopen = function () {
-          farEndSend({
-            type: 'session.created',
-            session: {
-              type: 'realtime',
-              instructions: 'You are the platform-configured Vivid agent. Be helpful about the product.',
-              tools: [{ type: 'function', name: 'navigate', description: 'stand-in for a server tool', parameters: { type: 'object', properties: {} } }],
-              voice: 'alloy'
-            }
-          });
+          farEndSend({ type: 'session.created', session: SESSION });
         };
       };
 
@@ -190,13 +182,32 @@
   /* ---------- the far end ---------- */
   var turn = 0;
 
+  /* the session as the far end holds it: what session.created announces,
+     what every patch is applied to, and what session.updated hands back.
+     The GA shape — the voice and the turn detection live under audio, and
+     a patch replaces that field whole, so anything switching transcription
+     on has to carry the rest of it back untouched. */
+  var SESSION = {
+    type: 'realtime',
+    instructions: 'You are the platform-configured Vivid agent. Be helpful about the product.',
+    tools: [{ type: 'function', name: 'navigate', description: 'stand-in for a server tool', parameters: { type: 'object', properties: {} } }],
+    audio: {
+      input: { format: 'pcm16', turn_detection: { type: 'server_vad', threshold: 0.5 } },
+      output: { format: 'pcm16', voice: 'alloy' }
+    }
+  };
+
   function farEndSend(event) { if (wire && wire.readyState === 'open') wire.send(JSON.stringify(event)); }
 
   function farEndHeard(event) {
     if (event.type === 'session.update') {
       console.info('[stub] session.update — tools:',
         (event.session.tools || []).map(function (t) { return t.name; }).join(', '));
-      farEndSend({ type: 'session.updated', session: event.session });
+      if (event.session.audio) console.info('[stub] session.update — audio:', JSON.stringify(event.session.audio));
+      /* a patch replaces the fields it names and leaves the rest alone,
+         and what comes back is the whole session, not the patch */
+      Object.keys(event.session).forEach(function (key) { SESSION[key] = event.session[key]; });
+      farEndSend({ type: 'session.updated', session: SESSION });
       return;
     }
 
